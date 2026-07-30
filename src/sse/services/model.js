@@ -86,7 +86,12 @@ export async function getComboModels(modelStr) {
   // Only check if it's not in provider/model format
   if (modelStr.includes("/")) return null;
 
-  const combo = await getComboByName(modelStr);
+  // Strip a trailing context-window suffix the client appends for its own
+  // bookkeeping (e.g. "9-fast-worker[1m]"). The suffix selects the 1M context
+  // window on the Claude Code side; it is not part of the combo name, so an
+  // exact lookup with it would miss and fall through to a provider route.
+  const comboName = modelStr.replace(/\[\s*1m\s*\]\s*$/i, "");
+  const combo = await getComboByName(comboName);
   if (combo && combo.models && combo.models.length > 0) {
     return combo.models;
   }

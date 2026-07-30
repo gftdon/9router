@@ -174,6 +174,11 @@ export const PROVIDER_CAPABILITIES = {
     "deepseek-v4-flash":  { vision: true, reasoning: true, thinkingFormat: "openai", thinkingCanDisable: false, contextWindow: 1000000, maxOutput: 50000 },
     "deepseek-v3-2-volc": { reasoning: true, thinkingFormat: "openai", thinkingCanDisable: false, contextWindow: 96000, maxOutput: 32000 },
   },
+  // Zhipu z.ai direct (provider alias "glm"). GLM-5.2 is 1M context / 128K output.
+  // Must override the `*glm-5*` pattern fallback (200K) which understates it.
+  "glm": {
+    "glm-5.2": { reasoning: true, thinkingFormat: "zai", contextWindow: 1000000, maxOutput: 128000 },
+  },
   // Poolside Laguna — OpenAI-compatible, all reasoning-capable (32K max output).
   "poolside": {
     "laguna-s-2.1":  { reasoning: true, thinkingFormat: "openai", contextWindow: 1000000, maxOutput: 32000 },
@@ -329,15 +334,25 @@ export function getCapabilitiesForModel(provider, model) {
 
   // Canonical exact lookup strips vendor prefix: "anthropic/claude-opus-4.7" -> "claude-opus-4.7".
   const baseModel = model.includes("/") ? model.split("/").pop() : model;
+  // Strip reasoning-effort suffix used in combos: "glm-5.2(high)" -> "glm-5.2".
+  // Without this, suffixed ids fall through to the pattern tier and lose the
+  // provider-specific contextWindow/maxOutput (e.g. GLM-5.2 1M -> 200K).
+  const stripSuffix = (m) => (typeof m === "string" ? m.replace(/\([^)]*\)\s*$/, "").trim() : m);
+  const lookupModel = stripSuffix(model);
+  const lookupBase = stripSuffix(baseModel);
 
   // 1. Provider-specific override
   if (provider) {
     const providerCaps = PROVIDER_CAPABILITIES[provider];
+    if (providerCaps?.[lookupModel]) return { ...DEFAULT_CAPABILITIES, ...providerCaps[lookupModel] };
+    if (providerCaps?.[lookupBase]) return { ...DEFAULT_CAPABILITIES, ...providerCaps[lookupBase] };
     if (providerCaps?.[model]) return { ...DEFAULT_CAPABILITIES, ...providerCaps[model] };
     if (providerCaps?.[baseModel]) return { ...DEFAULT_CAPABILITIES, ...providerCaps[baseModel] };
   }
 
   // 2. Canonical exact
+  if (MODEL_CAPABILITIES[lookupBase]) return { ...DEFAULT_CAPABILITIES, ...MODEL_CAPABILITIES[lookupBase] };
+  if (MODEL_CAPABILITIES[lookupModel]) return { ...DEFAULT_CAPABILITIES, ...MODEL_CAPABILITIES[lookupModel] };
   if (MODEL_CAPABILITIES[baseModel]) return { ...DEFAULT_CAPABILITIES, ...MODEL_CAPABILITIES[baseModel] };
   if (MODEL_CAPABILITIES[model]) return { ...DEFAULT_CAPABILITIES, ...MODEL_CAPABILITIES[model] };
 

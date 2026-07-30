@@ -139,7 +139,7 @@ const combo = await getComboByName(comboName);
 ```
 `[1m]` เป็น client-side bookkeeping ไม่ใช่ส่วนของ combo name
 
-### วิธีใช้ (ฝั่ง client) — **ต้องทำ 3 อย่างร่วมกัน**
+### วิธีใช้ (ฝั่ง client) — **การตั้งค่าที่ถูกต้อง**
 
 **1. เพิ่ม `CLAUDE_CODE_MAX_CONTEXT_TOKENS` ใน `~/.claude/settings.json` ⭐ (ตัวแก้จริง):**
 ```json
@@ -149,19 +149,20 @@ const combo = await getComboByName(comboName);
 > `CLAUDE_CODE_MAX_CONTEXT_TOKENS` (ตั้งแต่ Claude Code v2.1.193) บอกขนาด window ของ model ที่ไม่รู้จัก → เปลี่ยนเป็น `min(1M,1M) × 50% ≈ 500K`
 > อ้างอิง: GitHub issue anthropics/claude-code#68522, #46416 + docs code.claude.com/docs/en/env-vars
 
-**2. ตั้ง `[1m]` ใน `~/.claude/settings.json`** (tier default):
+**2. ตั้ง tier default ใน `~/.claude/settings.json`** (ใส่ `[1m]` ได้ เพราะ env นี้รองรับ suffix บน pinned model):
 ```json
-"ANTHROPIC_DEFAULT_SONNET_MODEL": "9-fast-worker[1m]"
+"ANTHROPIC_DEFAULT_SONNET_MODEL": "9-fast-worker"
 ```
 
-**3. ตั้ง `[1m]` ใน `~/.claude/agents/<agent>.md`** (frontmatter override tier default):
+**3. ตั้ง frontmatter ใน `~/.claude/agents/<agent>.md`** — **ใส่ bare name เท่านั้น ห้ามใส่ `[1m]`:**
 ```yaml
-model: 9-fast-worker[1m]
+model: 9-fast-worker
 ```
 
-> ⚠️ **จุดที่เคยพลาด 2 จุด:**
-> - ใส่ `[1m]` แต่ไม่ได้ใส่ `CLAUDE_CODE_MAX_CONTEXT_TOKENS` → `[1m]` บน gateway combo id ไม่มีผล (Claude Code ไม่รู้จัก) — **นี่คือสาเหตุที่ thrash ไม่หายแม้ใส่ [1m] แล้ว**
-> - ใส่ `[1m]` ใน settings แต่ลืม agents/*.md → frontmatter override ทำให้ส่ง `9-fast-worker` (ไม่มี [1m]) อยู่ดี
+> ⚠️ **จุดที่เคยพลาด / ข้อห้าม:**
+> - **`[1m]` ใส่ใน agents/*.md frontmatter ไม่ได้** — frontmatter `model:` รับแค่ alias (`sonnet`/`opus`/`haiku`/`fable`), full claude id (`claude-opus-5`), หรือ `inherit` เท่านั้น ใส่ `9-fast-worker[1m]` แล้ว Claude Code resolve ไม่ได้ → fallback ไป default teammate model (`claude-opus-5[1m]`) ซึ่ง router route ไม่ได้ → error "There's an issue with the selected model" (เจอจริงตอน spawn teammate)
+> - **`CLAUDE_CODE_MAX_CONTEXT_TOKENS` คือตัวให้ 1M window จริง** สำหรับ gateway combo id — `[1m]` ใน env เป็นแค่ทางเลือกเสริม ไม่จำเป็นถ้ามี MAX_CONTEXT_TOKENS แล้ว
+> - **1M window มาจาก MAX_CONTEXT_TOKENS ไม่ใช่ `[1m]`** — ดังนั้น frontmatter ใช้ bare name ได้ปลอดภัย ไม่ต้อง `[1m]`
 
 ### ผลยืนยัน end-to-end (หลังติดตั้ง)
 

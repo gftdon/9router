@@ -141,11 +141,23 @@ const combo = await getComboByName(comboName);
 
 ### วิธีใช้ (ฝั่ง client)
 
-ตั้ง sub-agent ให้ใช้ combo ที่มี `[1m]` ต่อท้าย เพื่อให้ได้ 1M window:
+ตั้งให้ sub-agent ใช้ combo ที่มี `[1m]` ต่อท้าย เพื่อให้ได้ 1M window — **ต้องใส่ทั้ง 2 ที่:**
+
+**1. `~/.claude/settings.json`** (tier default):
 ```json
 "ANTHROPIC_DEFAULT_SONNET_MODEL": "9-fast-worker[1m]"
 ```
-(ใน `~/.claude/settings.json`) — sub-agent ที่ route ผ่าน sonnet tier จะได้ 1M window แทน 200K
+
+**2. `~/.claude/agents/<agent>.md`** (frontmatter — **สำคัญ: agent ที่มี `model:` ชัดเจนจะ override tier default ข้อ 1**):
+```yaml
+---
+model: 9-fast-worker[1m]     # ไม่ใช่ 9-fast-worker เฉยๆ
+---
+```
+
+> ⚠️ **จุดที่เคยพลาด:** ใส่ `[1m]` ใน settings.json แล้วแต่ลืม agents/*.md — sub-agent ส่ง `9-fast-worker` (ไม่มี `[1m]`) อยู่ดีเพราะ frontmatter override tier default → thrash ไม่หาย ต้องแก้ทั้งคู่
+
+> ⚠️ **`[1m]` ใช้ได้เฉพาะ model id ที่ Claude Code รู้จักเท่านั้น** (GitHub issue anthropics/claude-code#68522 — unrecognized custom/gateway id ยังถูก hardcode 200K แม้ใส่ `[1m]`; combo name ของเราโชคดีที่ทำงานได้เพราะ router strip ออกก่อน route แต่ client ยังอ่าน suffix เพื่อเลือก window อยู่)
 
 ### ผลยืนยัน end-to-end (หลังติดตั้ง)
 

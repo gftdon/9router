@@ -3,6 +3,26 @@
 > เอกสารนี้บันทึก patch ที่เราแก้เองบน fork (`gftdon/9router`) แต่ยังไม่ได้ขึ้น upstream (`decolua/9router`)
 > **ทุกครั้งที่อัปเดต 9router เวอร์ชันใหม่ ให้เช็คไฟล์นี้ก่อน** — ถ้า patch ถูกเขียนทับ ให้ re-apply ตามขั้นตอนด้านล่างของแต่ละเคส
 
+## สรุป patch ทั้งหมด (ตามลำดับ commit)
+
+| Commit | ไฟล์ที่แก้ | แก้อะไร | สถานะ |
+|---|---|---|---|
+| `b55f405e` | `open-sse/providers/capabilities.js` | GLM-5.2 contextWindow 200K→1M + strip effort suffix ใน lookup | ✅ ใช้งานอยู่ |
+| `0bb6cc65` | `src/sse/services/model.js` | strip `[1m]` suffix ตอน resolve combo name | ✅ ใช้งานอยู่ |
+| — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | ⏳ รอตัดสินใจ |
+
+> ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
+
+## วิธี build + install ไป global ใหม่ (ใช้ร่วมกันทุก patch หลัง re-apply)
+
+```bash
+npm run build
+cd cli && npm install && cd ..
+npm run cli:pack          # ได้ 9router-<ver>.tgz ที่ ../
+npm install -g ../9router-<ver>.tgz
+# แล้วรีสตาร์ท 9router (kill process เดิมแล้วเปิดใหม่)
+```
+
 ---
 
 ## Patch 1: GLM-5.2 contextWindow ผิดทำให้ autocompact thrash เร็วผิดปกติ
@@ -86,15 +106,10 @@ console.log(c.contextWindow === 1000000 ? 'PATCH OK' : 'PATCH LOST — re-apply'
 
 ### วิธี build + install ไป global ใหม่ (หลัง re-apply)
 
+ดูขั้นตอนรวมที่หัวเอกสาร — เช็คเฉพาะของ patch นี้:
 ```bash
-npm run build
-cd cli && npm install && cd ..
-npm run cli:pack          # ได้ 9router-<ver>.tgz ที่ ../
-npm install -g ../9router-<ver>.tgz
-# ยืนยัน fix ใน global bundle:
 grep -o '"glm-5.2":{reasoning:!0,thinkingFormat:"zai",contextWindow:1e6' \
   ~/.local/lib/node_modules/9router/app/.next-cli-build/server/chunks/*.js
-# แล้วรีสตาร์ท 9router (kill process เดิมแล้วเปิดใหม่)
 ```
 
 ---
@@ -131,6 +146,14 @@ const combo = await getComboByName(comboName);
 "ANTHROPIC_DEFAULT_SONNET_MODEL": "9-fast-worker[1m]"
 ```
 (ใน `~/.claude/settings.json`) — sub-agent ที่ route ผ่าน sonnet tier จะได้ 1M window แทน 200K
+
+### ผลยืนยัน end-to-end (หลังติดตั้ง)
+
+```
+settings: ANTHROPIC_DEFAULT_SONNET_MODEL = "9-fast-worker[1m]"
+ส่ง model: "9-fast-worker[1m]" → ตอบ model: "glm-5.2" (ไม่ใช่ model_not_found)
+→ sub-agent ได้ 1M window + route เข้า combo ถูก
+```
 
 ### วิธีเช็คว่า patch ยังอยู่
 

@@ -139,25 +139,29 @@ const combo = await getComboByName(comboName);
 ```
 `[1m]` เป็น client-side bookkeeping ไม่ใช่ส่วนของ combo name
 
-### วิธีใช้ (ฝั่ง client)
+### วิธีใช้ (ฝั่ง client) — **ต้องทำ 3 อย่างร่วมกัน**
 
-ตั้งให้ sub-agent ใช้ combo ที่มี `[1m]` ต่อท้าย เพื่อให้ได้ 1M window — **ต้องใส่ทั้ง 2 ที่:**
+**1. เพิ่ม `CLAUDE_CODE_MAX_CONTEXT_TOKENS` ใน `~/.claude/settings.json` ⭐ (ตัวแก้จริง):**
+```json
+"CLAUDE_CODE_MAX_CONTEXT_TOKENS": "1000000"
+```
+> นี่คือ **ต้นเหตุที่ thrash ไม่หาย** — Claude Code ไม่รู้จัก `9-fast-worker` (gateway combo id) เลย hardcode window = 200K และ `AUTO_COMPACT_WINDOW=1M` ถูก clamp เหลือ 200K → `200K × 50% = 100K` = thrash threshold ที่เห็นพอดี
+> `CLAUDE_CODE_MAX_CONTEXT_TOKENS` (ตั้งแต่ Claude Code v2.1.193) บอกขนาด window ของ model ที่ไม่รู้จัก → เปลี่ยนเป็น `min(1M,1M) × 50% ≈ 500K`
+> อ้างอิง: GitHub issue anthropics/claude-code#68522, #46416 + docs code.claude.com/docs/en/env-vars
 
-**1. `~/.claude/settings.json`** (tier default):
+**2. ตั้ง `[1m]` ใน `~/.claude/settings.json`** (tier default):
 ```json
 "ANTHROPIC_DEFAULT_SONNET_MODEL": "9-fast-worker[1m]"
 ```
 
-**2. `~/.claude/agents/<agent>.md`** (frontmatter — **สำคัญ: agent ที่มี `model:` ชัดเจนจะ override tier default ข้อ 1**):
+**3. ตั้ง `[1m]` ใน `~/.claude/agents/<agent>.md`** (frontmatter override tier default):
 ```yaml
----
-model: 9-fast-worker[1m]     # ไม่ใช่ 9-fast-worker เฉยๆ
----
+model: 9-fast-worker[1m]
 ```
 
-> ⚠️ **จุดที่เคยพลาด:** ใส่ `[1m]` ใน settings.json แล้วแต่ลืม agents/*.md — sub-agent ส่ง `9-fast-worker` (ไม่มี `[1m]`) อยู่ดีเพราะ frontmatter override tier default → thrash ไม่หาย ต้องแก้ทั้งคู่
-
-> ⚠️ **`[1m]` ใช้ได้เฉพาะ model id ที่ Claude Code รู้จักเท่านั้น** (GitHub issue anthropics/claude-code#68522 — unrecognized custom/gateway id ยังถูก hardcode 200K แม้ใส่ `[1m]`; combo name ของเราโชคดีที่ทำงานได้เพราะ router strip ออกก่อน route แต่ client ยังอ่าน suffix เพื่อเลือก window อยู่)
+> ⚠️ **จุดที่เคยพลาด 2 จุด:**
+> - ใส่ `[1m]` แต่ไม่ได้ใส่ `CLAUDE_CODE_MAX_CONTEXT_TOKENS` → `[1m]` บน gateway combo id ไม่มีผล (Claude Code ไม่รู้จัก) — **นี่คือสาเหตุที่ thrash ไม่หายแม้ใส่ [1m] แล้ว**
+> - ใส่ `[1m]` ใน settings แต่ลืม agents/*.md → frontmatter override ทำให้ส่ง `9-fast-worker` (ไม่มี [1m]) อยู่ดี
 
 ### ผลยืนยัน end-to-end (หลังติดตั้ง)
 

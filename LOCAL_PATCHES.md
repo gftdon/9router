@@ -99,6 +99,49 @@ grep -o '"glm-5.2":{reasoning:!0,thinkingFormat:"zai",contextWindow:1e6' \
 
 ---
 
+## Patch 2: combo ที่มี `[1m]` suffix ไม่ resolve ทำให้ sub-agent ไม่ได้ 1M window
+
+**Commit:** `0bb6cc65` · **ไฟล์ที่แก้:** `src/sse/services/model.js` · **วันที่:** 2026-07-30
+
+### อาการ
+
+Sub-agent (ใช้ combo `9-fast-worker`) thrash ที่ ~117K ทั้งที่แก้ GLM caps แล้ว (Patch 1) และ route ไป GLM-5.2 (1M)
+
+### Root cause
+
+Claude Code เลือก context window จาก **model id** ไม่ใช่ capabilities ที่ router ส่ง:
+- ใส่ `[1m]` ต่อท้าย id → ได้ 1M window (`9-orchestrator[1m]` ของ main session ใช้วิธีนี้)
+- sub-agent ใช้ `9-fast-worker` (ไม่มี `[1m]`) → default 200K → thrash ที่ 117K
+
+แต่ตอนลองใส่ `[1m]` ให้ combo ดันเจอว่า **`9-fast-worker[1m]` ไม่ resolve** — `getComboByName` match ตรง ๆ เลยไม่เจอ combo ชื่อนี้ → fall through ไป openai provider → `model_not_found`
+
+### วิธีแก้ (`getComboModels` ใน `src/sse/services/model.js`)
+
+Strip `[1m]` ออกก่อน lookup combo:
+```js
+const comboName = modelStr.replace(/\[\s*1m\s*\]\s*$/i, "");
+const combo = await getComboByName(comboName);
+```
+`[1m]` เป็น client-side bookkeeping ไม่ใช่ส่วนของ combo name
+
+### วิธีใช้ (ฝั่ง client)
+
+ตั้ง sub-agent ให้ใช้ combo ที่มี `[1m]` ต่อท้าย เพื่อให้ได้ 1M window:
+```json
+"ANTHROPIC_DEFAULT_SONNET_MODEL": "9-fast-worker[1m]"
+```
+(ใน `~/.claude/settings.json`) — sub-agent ที่ route ผ่าน sonnet tier จะได้ 1M window แทน 200K
+
+### วิธีเช็คว่า patch ยังอยู่
+
+```bash
+grep -q 's\*1m' ~/.local/lib/node_modules/9router/app/.next-cli-build/server/chunks/*.js \
+  && echo "PATCH OK" || echo "PATCH LOST — re-apply"
+# หรือยิงเทส: model "9-fast-worker[1m]" ต้องตอบ ไม่ใช่ model_not_found
+```
+
+---
+
 ## Patch ที่ยังไม่ได้แก้ (รอตัดสินใจ)
 
 ### Bug A: `reason` injection ใน tool schema ว่าง (gemini/antigravity path)

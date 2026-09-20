@@ -22,6 +22,10 @@ export const UNSUPPORTED_SCHEMA_CONSTRAINTS = [
   "$schema", "$defs", "definitions", "const", "$ref", "$comment",
   // Annotation keywords (rejected by Gemini/Antigravity - e.g. MCP tool schemas set these)
   "deprecated", "readOnly", "writeOnly",
+  // Validation-library annotations (ajv-errors, zod-to-json-schema `errorMap`)
+  // that some agent/MCP tools leave in their schemas — Gemini rejects with
+  // "Unknown name "errorMessage" at '...parameters...items': Cannot find field"
+  "errorMessage", "errorMessages",
   // Object validation keywords (not supported)
   "additionalProperties", "propertyNames", "patternProperties", "enumDescriptions",
   // Complex schema keywords (handled by flattenAnyOfOneOf/mergeAllOf)
@@ -137,7 +141,10 @@ export function generateProjectId() {
 
 // Helper: Remove unsupported keywords recursively from object/array
 // Also strips all vendor extension fields (x- prefixed) not supported by Gemini
-function removeUnsupportedKeywords(obj, keywords) {
+// `isPropertyMap` marks an object whose keys are user-chosen property names
+// (the value of `properties`), not schema keywords — a tool parameter named
+// "errorMessage" / "title" / "format" must survive, only its schema is cleaned.
+function removeUnsupportedKeywords(obj, keywords, isPropertyMap = false) {
   if (!obj || typeof obj !== "object") return;
 
   if (Array.isArray(obj)) {
@@ -148,14 +155,14 @@ function removeUnsupportedKeywords(obj, keywords) {
   }
 
   for (const key of Object.keys(obj)) {
-    if (keywords.includes(key) || key.startsWith("x-")) {
+    if (!isPropertyMap && (keywords.includes(key) || key.startsWith("x-"))) {
       delete obj[key];
       continue;
     }
 
     const value = obj[key];
     if (value && typeof value === "object") {
-      removeUnsupportedKeywords(value, keywords);
+      removeUnsupportedKeywords(value, keywords, !isPropertyMap && key === "properties");
     }
   }
 }

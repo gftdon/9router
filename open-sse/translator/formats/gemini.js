@@ -7,13 +7,25 @@ import { OPENAI_BLOCK } from "../schema/index.js";
 export const UNSUPPORTED_SCHEMA_CONSTRAINTS = [
   // Basic constraints (not supported by Gemini API)
   "minLength", "maxLength", "exclusiveMinimum", "exclusiveMaximum",
-  "minItems", "maxItems", "format",
+  "minItems", "maxItems", "format", "multipleOf",
+  // Array keywords the Gemini schema proto has no field for. Agent tool
+  // schemas set these routinely, and one occurrence rejects the whole request
+  // with "Unknown name ...: Cannot find field".
+  "uniqueItems", "contains",
+  // 2020-12 keywords with no Gemini equivalent
+  "unevaluatedProperties", "unevaluatedItems", "contentSchema",
+  // Tuple-array keywords; converted to items first, leftovers stripped
+  "prefixItems", "additionalItems",
   // Claude rejects these in VALIDATED mode
   "default", "examples",
   // JSON Schema meta keywords
   "$schema", "$defs", "definitions", "const", "$ref", "$comment",
   // Annotation keywords (rejected by Gemini/Antigravity - e.g. MCP tool schemas set these)
   "deprecated", "readOnly", "writeOnly",
+  // Validation-library annotations (ajv-errors, zod-to-json-schema `errorMap`)
+  // that some agent/MCP tools leave in their schemas — Gemini rejects with
+  // "Unknown name "errorMessage" at '...parameters...items': Cannot find field"
+  "errorMessage", "errorMessages",
   // Object validation keywords (not supported)
   "additionalProperties", "propertyNames", "patternProperties", "enumDescriptions",
   // Complex schema keywords (handled by flattenAnyOfOneOf/mergeAllOf)
@@ -129,7 +141,10 @@ export function generateProjectId() {
 
 // Helper: Remove unsupported keywords recursively from object/array
 // Also strips all vendor extension fields (x- prefixed) not supported by Gemini
-function removeUnsupportedKeywords(obj, keywords) {
+// `isPropertyMap` marks an object whose keys are user-chosen property names
+// (the value of `properties`), not schema keywords — a tool parameter named
+// "errorMessage" / "title" / "format" must survive, only its schema is cleaned.
+function removeUnsupportedKeywords(obj, keywords, isPropertyMap = false) {
   if (!obj || typeof obj !== "object") return;
 
   if (Array.isArray(obj)) {
@@ -140,14 +155,14 @@ function removeUnsupportedKeywords(obj, keywords) {
   }
 
   for (const key of Object.keys(obj)) {
-    if (keywords.includes(key) || key.startsWith("x-")) {
+    if (!isPropertyMap && (keywords.includes(key) || key.startsWith("x-"))) {
       delete obj[key];
       continue;
     }
 
     const value = obj[key];
     if (value && typeof value === "object") {
-      removeUnsupportedKeywords(value, keywords);
+      removeUnsupportedKeywords(value, keywords, !isPropertyMap && key === "properties");
     }
   }
 }
@@ -302,6 +317,37 @@ function ensureObjectType(obj) {
   for (const v of Object.values(obj)) if (v && typeof v === "object") ensureObjectType(v);
 }
 
+// Convert prefixItems (tuple validation) to items — Gemini cannot express tuples,
+// and a type:"array" schema without items is rejected with "missing field"
+function convertPrefixItems(obj) {
+  if (!obj || typeof obj !== "object") return;
+
+  if (Array.isArray(obj.prefixItems) && obj.prefixItems.length > 0) {
+    const variants = obj.prefixItems.filter(s => s && s.type !== "null");
+    if (!obj.items && variants.length === 1) {
+      obj.items = variants[0];
+    } else if (!obj.items && variants.length > 1) {
+      obj.items = { anyOf: variants };
+    }
+    delete obj.prefixItems;
+  }
+
+  for (const value of Object.values(obj)) {
+    if (value && typeof value === "object") {
+      convertPrefixItems(value);
+    }
+  }
+}
+
+// Gemini requires items on every type:"array" schema — fill a permissive placeholder
+function ensureArrayItems(obj) {
+  if (!obj || typeof obj !== "object") return;
+  if (obj.type === "array" && !obj.items) {
+    obj.items = { type: "string" };
+  }
+  for (const v of Object.values(obj)) if (v && typeof v === "object") ensureArrayItems(v);
+}
+
 // Clean JSON Schema for Antigravity API compatibility - removes unsupported keywords recursively
 export function cleanJSONSchemaForAntigravity(schema) {
   if (!schema || typeof schema !== "object") return schema;
@@ -315,11 +361,13 @@ export function cleanJSONSchemaForAntigravity(schema) {
 
   // Phase 2: Flatten complex structures
   mergeAllOf(cleaned);
+  convertPrefixItems(cleaned);
   flattenAnyOfOneOf(cleaned);
   flattenTypeArrays(cleaned);
 
   // Phase 2.5: Infer missing type=object when properties exist (Gemini requirement)
   ensureObjectType(cleaned);
+  ensureArrayItems(cleaned);
 
   // Phase 3: Remove all unsupported keywords at ALL levels (including inside arrays)
   removeUnsupportedKeywords(cleaned, UNSUPPORTED_SCHEMA_CONSTRAINTS);
@@ -390,4 +438,22 @@ export function cleanJSONSchemaForAntigravity(schema) {
 
   return cleaned;
 }
+
+// Merge adjacent same-role messages, strip empty parts, ensure initial user turn
+export function normalizeGeminiContents(contents) {
+  const out = [];
+  for (const c of contents || []) {
+    if (!c?.role || !Array.isArray(c.parts)) continue;
+    const parts = c.parts.filter(p => p && Object.keys(p).length > 0);
+    if (parts.length === 0) continue;
+    const last = out.at(-1);
+    if (last?.role === c.role) last.parts.push(...parts);
+    else out.push({ ...c, parts: [...parts] });
+  }
+  if (out.length > 0 && out[0].role !== "user") {
+    out.unshift({ role: "user", parts: [{ text: "..." }] });
+  }
+  return out;
+}
+
 

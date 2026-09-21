@@ -9,6 +9,7 @@
 |---|---|---|---|
 | `b55f405e` | `open-sse/providers/capabilities.js` | GLM-5.2 contextWindow 200K→1M + strip effort suffix ใน lookup | ✅ ใช้งานอยู่ |
 | `0bb6cc65` | `src/sse/services/model.js` | strip `[1m]` suffix ตอน resolve combo name | ✅ ใช้งานอยู่ |
+| `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE |
 | — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | ⏳ รอตัดสินใจ |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -179,6 +180,42 @@ grep -q 's\*1m' ~/.local/lib/node_modules/9router/app/.next-cli-build/server/chu
   && echo "PATCH OK" || echo "PATCH LOST — re-apply"
 # หรือยิงเทส: model "9-fast-worker[1m]" ต้องตอบ ไม่ใช่ model_not_found
 ```
+
+---
+
+## LP-003: Preserve native Claude thinking blocks
+
+**Status:** ACTIVE · **Commit:** `b35cdcac` · **Date:** 2026-09-21
+
+**Scope:** Claude Code native passthrough, including a single-model Combo routed to Claude.
+
+**Root cause:** `normalizeClaudePassthrough` used an E/R-only signature heuristic. Real Opus 5 responses in the affected sessions carried `CAIS...` signatures, which the router discarded. With manual thinking enabled it inserted a hardcoded signed placeholder; with adaptive thinking it dropped the blocks. `redacted_thinking` blocks were also discarded because their opaque payload is in `data`, not `signature`.
+
+This behavior is present in upstream snapshot `23ae82d8` (v0.5.81), not introduced by a local patch. No upstream issue/PR has been filed for LP-003.
+
+**Change:** Native passthrough now retains all existing thinking and redacted-thinking blocks in order without parsing/replacing their signatures, including empty thinking text. It no longer fabricates a thinking block for tool-only history. Existing foreign server-tool-id cleanup remains in place. Signature authenticity, including mixed-provider history, is validated by Anthropic; this patch does not override refusals. Non-native translation paths are outside this patch.
+
+**Files:**
+- `open-sse/translator/formats/claude.js`
+- `tests/unit/claude-native-thinking.test.js`
+
+**Validation:**
+- Eight regression cases through Combo → `handleChatCore` → executor failed before the fix and passed afterward (Opus 5, Fable 5, Fable 5.1; manual/adaptive/disabled thinking; redacted blocks; no fabricated signature).
+- Targeted suite: 45/45 passed; ESLint and `git diff --check` passed.
+- Four additional failures were reproduced on the pre-patch source: system-message hoisting expectation, an obsolete expected-failure for tool-result images, gotScraping routing expectation, and empty Read pages response-delta expectation.
+- The actual Opus signature from an affected transcript is preserved in both manual and adaptive modes after the fix. Private signatures are not committed as fixtures.
+- `npm run cli:pack` passed; the packaged normalizer was checked directly and preserves opaque/redacted blocks.
+- Installed the local v0.5.81 package and restarted after confirming no active requests. `/api/health` returned `{"ok":true}`; the installed chunk hash matches the tested package and its normalizer preserves opaque/redacted blocks.
+- Package SHA-256: `7b2c7bcfe9150c438c8fa3fae1897c3ad3852c61238eb921df4b9707d1b76740`.
+- Pre-install application backup: `/tmp/9router-before-LP003-20260921/9router` (temporary local rollback copy; provider data and Combo settings remain in `~/.9router`).
+- Live post-install Claude Code probe through `9-orchestrator` → `claude-opus-5`: two sequential Read calls and a final answer, three distinct model responses, exit 0, no refusal. Used the normal settings/hooks with built-in tools restricted to Read.
+- Fable 5.1 live probes (normal and minimal context) were blocked by upstream HTTP 429, surfaced by the router as 503. No live Fable success is claimed; its request-preservation regression cases passed locally.
+
+**Acceptance limit:** Fixes a demonstrated protocol corruption. The intermittent `[reasoning_extraction]` refusal was not reproduced by the earlier minimal live probes, so this patch alone is not evidence that every refusal is resolved.
+
+**Upstream upgrades:** Preserve this patch until the native passthrough path keeps opaque thinking/redacted blocks unmodified and no longer inserts synthetic signed placeholders. Do not decide from release notes alone.
+
+Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thinking-models
 
 ---
 

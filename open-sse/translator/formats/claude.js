@@ -257,35 +257,24 @@ export function normalizeClaudePassthrough(body, model = "") {
     body.messages = messages;
   }
 
-  // 5. Drop thinking blocks whose signature is not Claude's (combo mixes models,
-  // so foreign signatures leak into history and Anthropic rejects them).
-  const thinkingEnabled = body.thinking?.type === "enabled";
+  // 5. Preserve native thinking/redacted_thinking blocks exactly as received.
+  // Signatures and redacted data are opaque; prefix heuristics reject newer
+  // Claude signatures (e.g. CAIS...) and must not replace them with a placeholder.
+  // Leave authenticity validation to Anthropic, including mixed-provider history.
+  // Only remove foreign server-tool ids and their paired results here.
   const droppedServerToolUseIds = new Set();
   if (Array.isArray(body.messages)) {
     for (const msg of body.messages) {
       if (msg.role !== ROLE.ASSISTANT || !Array.isArray(msg.content)) continue;
-      let hasToolUse = false;
-      let hasKeptThinking = false;
       const kept = [];
       for (const block of msg.content) {
-        if (block.type === CLAUDE_BLOCK.THINKING || block.type === CLAUDE_BLOCK.REDACTED_THINKING) {
-          if (isValidClaudeSignature(block.signature)) {
-            hasKeptThinking = true;
-            kept.push(block);
-          }
-          continue;
-        }
         if (hasForeignServerToolUseId(block)) {
           if (block.id != null) droppedServerToolUseIds.add(String(block.id));
           continue;
         }
-        if (block.type === CLAUDE_BLOCK.TOOL_USE) hasToolUse = true;
         kept.push(block);
       }
       msg.content = kept;
-      if (thinkingEnabled && !hasKeptThinking && hasToolUse) {
-        msg.content.unshift(buildThinkingPlaceholder("claude"));
-      }
     }
   }
 

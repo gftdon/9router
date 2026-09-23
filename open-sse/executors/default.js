@@ -164,9 +164,21 @@ export class DefaultExecutor extends BaseExecutor {
     // a node fronting Kimi or GLM answers on its own ids and never matches, so
     // gateways that would choke on unknown beta flags are left untouched.
     const isClaudeModel = typeof model === "string" && /^claude-/.test(model);
-    if (model && (this.provider === "claude"
-      || (this.provider?.startsWith?.("anthropic-compatible-") && isClaudeModel))) {
+    const isClaudeUpstream = this.provider === "claude"
+      || (this.provider?.startsWith?.("anthropic-compatible-") && isClaudeModel);
+    if (model && isClaudeUpstream) {
       headers["Anthropic-Beta"] = selectAnthropicBeta(model, body);
+    }
+
+    // Keep the real Claude Code version. Replacing it with the static provider
+    // default makes an updated client fail upstream's minimum-version check.
+    const clientUserAgent = credentials?.rawHeaders?.["user-agent"];
+    if (isClaudeUpstream && typeof clientUserAgent === "string"
+      && /^claude-(?:cli|code)\//i.test(clientUserAgent)) {
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === "user-agent") delete headers[key];
+      }
+      headers["User-Agent"] = clientUserAgent;
     }
 
     // Strip first-party Claude Code identity headers for non-Anthropic anthropic-compatible upstreams

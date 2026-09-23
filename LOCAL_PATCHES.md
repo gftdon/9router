@@ -16,15 +16,32 @@
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
+## สรุปการแก้ Claude สำหรับ v0.5.82
+
+| เส้นทาง | Patch | พฤติกรรมที่ต้องรักษาไว้ |
+|---|---|---|
+| Claude Code native → Claude | LP-003 | เก็บ thinking / redacted-thinking และ opaque signature เดิม ไม่แทรก signed placeholder |
+| Claude Code native → Claude | LP-004 | ส่ง User-Agent และเวอร์ชันจริงจาก client รวมถึงเมื่อ client อัปเดตในอนาคต |
+| Add Model/Test และคำขอที่ผ่านการแปลงรูปแบบ | LP-005 | ใช้ค่าเริ่มต้น 2.1.280 ให้ตรงกันทั้ง User-Agent และ billing attribution |
+
+LP-004 อย่างเดียวไม่ครอบคลุม Add Model เพราะคำขอนี้ไม่มี User-Agent ของ Claude Code ต้องรักษา LP-005 ด้วย ผลทดสอบ `cc/claude-opus-5-5` ผ่าน API เดียวกับปุ่ม Test ได้ HTTP 200 / `ok: true` และผู้ใช้ยืนยันว่าใช้งานได้แล้วเมื่อ 2026-09-23
+
+เวอร์ชันซอร์สและ CLI manifest สำหรับการบันทึกรอบนี้คือ **v0.5.82** ส่วนหลักฐาน build, hash และ live validation ด้านล่างเป็นแพ็กเกจ **v0.5.81 ที่ใส่แพตช์แล้ว** ซึ่งติดตั้งและทดสอบก่อนขยับหมายเลขเวอร์ชัน
+
 ## วิธี build + install ไป global ใหม่ (ใช้ร่วมกันทุก patch หลัง re-apply)
 
+รันจาก repository root; `cli:pack` รวมขั้น build อยู่แล้ว และวาง `.tgz` ไว้ที่ root ของ repository:
+
 ```bash
-npm run build
-cd cli && npm install && cd ..
-npm run cli:pack          # ได้ 9router-<ver>.tgz ที่ ../
-npm install -g ../9router-<ver>.tgz
-# แล้วรีสตาร์ท 9router (kill process เดิมแล้วเปิดใหม่)
+npm run cli:pack
+router_version=$(node -p "require('./cli/package.json').version")
+# สำรอง global install ตรวจว่าไม่มีคำขอค้าง แล้วปิด 9Router
+npm install --global "./9router-${router_version}.tgz"
+# เปิด 9Router ใหม่
+curl --fail http://127.0.0.1:20128/api/health
 ```
+
+สำรอง global install ก่อนเปลี่ยนแพ็กเกจ และตรวจว่าตัวที่รันอยู่มาจากแพ็กเกจใหม่ จากนั้นทดสอบเส้นทางที่เกิดปัญหาจริง สำหรับ LP-005 ให้ใช้ Add Model → `claude-opus-5-5` → Test (หรือ POST `/api/models/test` ด้วย `{"model":"cc/claude-opus-5-5"}` โดยใช้ dashboard/CLI authentication) ต้องได้ `ok: true` และ `status: 200`; การทดสอบโมเดลอื่นผ่าน Combo ไม่ยืนยันผลของเส้นทางนี้
 
 ---
 
@@ -248,7 +265,7 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 - Live post-install Claude Code 2.1.280 probe through `9-orchestrator` completed successfully, with three distinct Opus 5 responses and a final answer containing both package versions. No Kimi fallback was observed.
 - Fable 5.1 returned an upstream `[cyber]` refusal in the minimal probe both before and after installation. No Fable completion success is claimed; this is distinct from the minimum-version HTTP 400.
 
-**Acceptance limit:** The reported minimum-version HTTP 400 did not reproduce in the minimal pre-install probes. Header corruption was reproduced deterministically and corrected; successful Opus calls alone do not prove every model accepts every request.
+**Acceptance limit:** The reported minimum-version HTTP 400 did not reproduce in the minimal pre-install CLI probes. The user later clarified that it occurred in the dashboard Add Model test for Opus 5.5; LP-005 reproduces and fixes that separate path. Header corruption was reproduced deterministically and corrected by LP-004; successful Opus 5 CLI calls alone do not validate dashboard probes or Opus 5.5.
 
 **Upstream upgrades:** Retain until the upstream executor preserves the actual incoming Claude Code version. Merely increasing `CLAUDE_CLI_VERSION` leaves the next client update vulnerable to the same mismatch.
 
@@ -280,6 +297,7 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 - Package SHA-256: `7960811fe1397de0598cf7876cfd29acc6c3da0010940f27a75453293828b2c0`.
 - Pre-install backup: `/tmp/9router-before-LP005-20260923/9router` (temporary local rollback copy).
 - The identical post-install Add Model test returned `{"ok":true,"latencyMs":2449,"error":null,"status":200}` for `cc/claude-opus-5-5`. This is a direct model probe, not a Combo fallback.
+- User acceptance on 2026-09-23: confirmed the Add Model operation now works after installing LP-005.
 
 **Upstream tracking:** No upstream issue/PR filed for LP-005. Retain until the compatibility default meets Opus 5.5's requirement in both generated headers and billing attribution. Preserve LP-004's native passthrough separately.
 

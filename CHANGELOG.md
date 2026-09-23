@@ -1,3 +1,18 @@
+# v0.5.82 (2026-09-23)
+
+## Fixes
+- **Claude native passthrough (LP-003)**: preserve existing thinking and redacted-thinking blocks, including opaque signatures and empty thinking text, without inserting synthetic signed placeholders.
+- **Claude Code version forwarding (LP-004)**: retain the incoming native client's User-Agent when routing to Claude so the router no longer replaces an updated client's version with its static default.
+- **Dashboard Add Model (LP-005)**: update the shared Claude compatibility default to 2.1.280 in both generated User-Agent and billing attribution. Testing `cc/claude-opus-5-5` through `/api/models/test` now succeeds instead of returning `claude_code_version_too_old`.
+
+## Docs
+- Record the separate scope and regression coverage of LP-003, LP-004 and LP-005 in `LOCAL_PATCHES.md`, including the successful Opus 5.5 dashboard probe and user confirmation.
+- Correct the local package installation path and document verification after rebuilding and restarting.
+
+## Validation
+- 83 targeted tests passed; ESLint and CLI build/pack passed before this source version bump. The locally installed patched v0.5.81 returned HTTP 200 with `ok: true` for the exact Opus 5.5 Add Model probe; the user also confirmed success.
+- LP-003 repairs demonstrated request corruption; it does not establish that every intermittent refusal is resolved. Fable 5.1's separate upstream `[cyber]` refusal remains outside the version fix.
+
 # v0.5.81 (2026-09-18)
 
 ## Features

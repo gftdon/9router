@@ -10,6 +10,7 @@
 | `b55f405e` | `open-sse/providers/capabilities.js` | GLM-5.2 contextWindow 200K→1M + strip effort suffix ใน lookup | ✅ ใช้งานอยู่ |
 | `0bb6cc65` | `src/sse/services/model.js` | strip `[1m]` suffix ตอน resolve combo name | ✅ ใช้งานอยู่ |
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE |
+| `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE |
 | — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | ⏳ รอตัดสินใจ |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -216,6 +217,39 @@ This behavior is present in upstream snapshot `23ae82d8` (v0.5.81), not introduc
 **Upstream upgrades:** Preserve this patch until the native passthrough path keeps opaque thinking/redacted blocks unmodified and no longer inserts synthetic signed placeholders. Do not decide from release notes alone.
 
 Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thinking-models
+
+---
+
+## LP-004: Preserve the actual Claude Code client version
+
+**Status:** ACTIVE · **Commit:** `ac47e8b7` · **Date:** 2026-09-23
+
+**Scope:** Incoming Claude Code requests routed to the `claude` provider or a Claude model on an `anthropic-compatible-*` provider.
+
+**Symptom:** Upstream reports `claude_code_version_too_old`, naming 2.1.258 and requiring 2.1.280, even though the installed Claude Code is already 2.1.280. Restarting the router does not update the compiled header default.
+
+**Root cause:** `DefaultExecutor.buildHeaders` overwrote the incoming User-Agent with the provider's static `CLAUDE_CLI_VERSION` (2.1.258). This behavior is present in upstream snapshot `23ae82d8` (v0.5.81), not introduced by LP-003. No upstream issue/PR has been filed for LP-004.
+
+**Change:** Preserve the incoming Claude Code User-Agent, including its actual version, for Claude upstreams. An older client continues to identify as older; a future client does not require another pinned-version update. Keep provider authentication, non-Claude routes, and non-Claude-client defaults unchanged. The existing native path preserves the client's billing attribution block. This patch does not change upstream model/version eligibility checks or refusals.
+
+**Files:**
+- `open-sse/executors/default.js`
+- `tests/unit/claude-client-version.test.js`
+
+**Validation:**
+- Five regression cases failed before the fix, including Combo → `handleChatCore` → real executor → mocked fetch for Opus 5 and Fable 5.1, demonstrating 2.1.280 being replaced by 2.1.258.
+- All nine new cases passed after the fix; 54/54 targeted tests passed including LP-003, plus 17/17 existing executor header cases. The unrelated proxy transport cases were excluded; one has a previously confirmed baseline failure.
+- ESLint, `git diff --check`, and `npm run cli:pack` passed.
+- The packaged and installed executors both preserve the supplied client version. Installed executor chunk SHA-256 matches the tested build: `4f5eae3f7e4cbf4c129e25034e92f90a96f265f011c8c7ed6d2fe892a3287096`.
+- Package SHA-256: `eb3eadb467d52cd97e98209d8ccc78cedaa9afb32166112d49495a70fc6ba4d9`.
+- Installed local v0.5.81 and restarted after checking zero active requests; `/api/health` returned `{"ok":true}`, with a new listener process.
+- Pre-install backup: `/tmp/9router-before-LP004-20260923/9router` (temporary local rollback copy).
+- Live post-install Claude Code 2.1.280 probe through `9-orchestrator` completed successfully, with three distinct Opus 5 responses and a final answer containing both package versions. No Kimi fallback was observed.
+- Fable 5.1 returned an upstream `[cyber]` refusal in the minimal probe both before and after installation. No Fable completion success is claimed; this is distinct from the minimum-version HTTP 400.
+
+**Acceptance limit:** The reported minimum-version HTTP 400 did not reproduce in the minimal pre-install probes. Header corruption was reproduced deterministically and corrected; successful Opus calls alone do not prove every model accepts every request.
+
+**Upstream upgrades:** Retain until the upstream executor preserves the actual incoming Claude Code version. Merely increasing `CLAUDE_CLI_VERSION` leaves the next client update vulnerable to the same mismatch.
 
 ---
 

@@ -11,6 +11,7 @@
 | `0bb6cc65` | `src/sse/services/model.js` | strip `[1m]` suffix ตอน resolve combo name | ✅ ใช้งานอยู่ |
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE |
+| `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | ACTIVE |
 | — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | ⏳ รอตัดสินใจ |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -250,6 +251,37 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 **Acceptance limit:** The reported minimum-version HTTP 400 did not reproduce in the minimal pre-install probes. Header corruption was reproduced deterministically and corrected; successful Opus calls alone do not prove every model accepts every request.
 
 **Upstream upgrades:** Retain until the upstream executor preserves the actual incoming Claude Code version. Merely increasing `CLAUDE_CLI_VERSION` leaves the next client update vulnerable to the same mismatch.
+
+---
+
+## LP-005: Opus 5.5 in the dashboard Add Model test
+
+**Status:** ACTIVE · **Commit:** `83bda598` · **Date:** 2026-09-23
+
+**Scope:** Dashboard Add Model/Test and other translated requests without an incoming Claude Code identity. Complements LP-004, which only forwards an existing native client User-Agent.
+
+**Root cause:** `AddCustomModelModal` calls `/api/models/test`; `pingModelByKind` then sends an OpenAI-format request to internal chat completions without a Claude Code User-Agent. Both the provider's default User-Agent and the generated billing attribution therefore used the static `CLAUDE_CLI_VERSION = "2.1.258"`. Opus 5.5 rejects this version and requires 2.1.280. Restarting does not update a compiled constant. The default comes from upstream snapshot `23ae82d8`, not a local patch. LP-004's earlier Opus 5 CLI probe did not cover this dashboard path or Opus 5.5.
+
+**Change:** Update the shared compatibility default to 2.1.280 so the generated User-Agent and billing attribution agree. Native Claude Code requests still retain their actual version, including older clients. The default remains a maintained compatibility value and may need updating when upstream requirements change; this patch does not infer it from a locally installed executable.
+
+**Files:**
+- `open-sse/providers/shared.js`
+- `tests/unit/claude-client-version.test.js`
+- `tests/unit/claude-cloaking.test.js`
+- `tests/unit/claude-header-forwarding.test.js`
+
+**Validation:**
+- Before the fix, an authenticated POST to the actual `/api/models/test` endpoint with `{"model":"cc/claude-opus-5-5"}` reproduced the exact HTTP 400 `claude_code_version_too_old`, reporting 2.1.258 and requiring 2.1.280.
+- A regression test using the dashboard's OpenAI-format request through `handleChatCore`, translation and the real executor failed on both the outbound User-Agent and billing version before the fix. It passes after the change.
+- 66/66 targeted tests plus 17/17 existing executor header cases passed (83 total). Tests cover model probing, native version forwarding and LP-003 thinking preservation. Unrelated proxy transport cases were excluded, as in LP-004.
+- ESLint, `git diff --check`, and `npm run cli:pack` passed. Packaging required sandbox escalation to access the existing npm cache; no cache ownership changes were made.
+- The compiled package was checked directly: default User-Agent and billing version are 2.1.280; a native 2.1.100 User-Agent remains unchanged.
+- Installed and restarted after confirming zero active requests. `/api/health` returned `{"ok":true}`; all installed server chunks match the tested build, ID `UL94RM1fRuEoRY3XL_4Z5`.
+- Package SHA-256: `7960811fe1397de0598cf7876cfd29acc6c3da0010940f27a75453293828b2c0`.
+- Pre-install backup: `/tmp/9router-before-LP005-20260923/9router` (temporary local rollback copy).
+- The identical post-install Add Model test returned `{"ok":true,"latencyMs":2449,"error":null,"status":200}` for `cc/claude-opus-5-5`. This is a direct model probe, not a Combo fallback.
+
+**Upstream tracking:** No upstream issue/PR filed for LP-005. Retain until the compatibility default meets Opus 5.5's requirement in both generated headers and billing attribution. Preserve LP-004's native passthrough separately.
 
 ---
 

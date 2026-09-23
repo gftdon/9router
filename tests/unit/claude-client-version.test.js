@@ -32,6 +32,35 @@ describe("Claude Code version forwarding", () => {
     }));
   });
 
+  it("uses an Opus 5.5-compatible default for the dashboard's OpenAI-format model test", async () => {
+    // AddCustomModelModal -> /api/models/test -> pingModelByKind sends this
+    // OpenAI-format request without a Claude Code User-Agent or attribution.
+    const body = {
+      model: "cc/claude-opus-5-5", max_tokens: 1024, stream: false,
+      messages: [{ role: "user", content: "hi" }],
+    };
+    await handleChatCore({
+      body, modelInfo: { provider: "claude", model: "claude-opus-5-5" },
+      credentials: { accessToken: "sk-ant-oat-fixture", providerSpecificData: {} },
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      connectionId: "fixture", sourceFormatOverride: "openai",
+      rtkEnabled: false, headroomEnabled: false, cavemanEnabled: false,
+      ponytailEnabled: false, pxpipeEnabled: false,
+      clientRawRequest: {
+        endpoint: "/api/v1/chat/completions", body,
+        headers: { "content-type": "application/json" },
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0];
+    const upstreamBody = JSON.parse(init.body);
+    expect(upstreamBody.model).toBe("claude-opus-5-5");
+    expect.soft(new Headers(init.headers).get("user-agent"))
+      .toBe("claude-cli/2.1.280 (external, sdk-cli)");
+    expect.soft(upstreamBody.system[0].text)
+      .toMatch(/^x-anthropic-billing-header: cc_version=2\.1\.280\./);
+  });
+
   it.each(["claude-opus-5", "claude-fable-5-1"])(
     "keeps the actual CLI version through Combo to the %s upstream request", async (model) => {
       const userAgent = "claude-cli/2.1.280 (external, cli)";

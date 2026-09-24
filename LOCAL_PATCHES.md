@@ -7,16 +7,35 @@
 
 | Commit | ไฟล์ที่แก้ | แก้อะไร | สถานะ |
 |---|---|---|---|
-| `b55f405e` | `open-sse/providers/capabilities.js` | GLM-5.2 contextWindow 200K→1M + strip effort suffix ใน lookup | ✅ ใช้งานอยู่ |
-| `0bb6cc65` | `src/sse/services/model.js` | strip `[1m]` suffix ตอน resolve combo name | ✅ ใช้งานอยู่ |
+| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / MODIFIED |
+| `0bb6cc65` | `src/sse/services/model.js` | Patch 2: strip `[1m]` suffix ตอน resolve combo name | ACTIVE / KEPT |
+| `c31f4070` | `open-sse/translator/formats/gemini.js` | LP-006: strip schema annotations โดยรักษาชื่อ property จริง (เพิ่มทะเบียนย้อนหลัง) | ACTIVE / KEPT |
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE |
-| `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | ACTIVE |
+| `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
 | — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | ⏳ รอตัดสินใจ |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
-## สรุปการแก้ Claude สำหรับ v0.5.82
+## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.86 — 2026-09-24
+
+Upstream: tag `v0.5.86`, commit `39e36d3d0c849e0e01dfeacddf111edf892448fc`. เทียบ implementation จริงกับ fork v0.5.82 (`a4e9bff3`); ตัวที่ติดตั้งก่อนอัปเดตคือ v0.5.81 พร้อมแพตช์ LP-003–LP-005
+
+| Patch | ผล | หลักฐานและการปรับ |
+|---|---|---|
+| Patch 1 — GLM-5.2 | MODIFIED | `5c217d34` เพิ่ม canonical GLM-5.2 1M / 131072 แล้ว จึงลบ provider override เดิมที่ทับ maxOutput เป็น 128000 แต่เก็บ suffix lookup เพราะ upstream ยังอ่าน `glm-5.2(high)` ไม่ตรง exact entry |
+| Patch 2 — Combo `[1m]` | KEPT | `src/sse/services/model.js` ของ upstream ยัง lookup Combo ด้วยชื่อเต็มรวม suffix |
+| LP-003 — native thinking | KEPT | upstream ยังตรวจ signature แบบเดิมและแทรก placeholder; การแก้ refusal ใน `0f488c70` เป็นฝั่ง response จึงไม่แทนแพตช์นี้ |
+| LP-004 — native client version | KEPT | upstream ยังใช้ static User-Agent ใน executor โดยไม่ส่งค่าจริงจาก native client |
+| LP-005 — dashboard version | UPSTREAM_FIXED | `cbffeb97` เปลี่ยน `CLAUDE_CLI_VERSION` เป็น 2.1.280 และเพิ่ม Opus 5.5; ใช้ไฟล์ `shared.js` ของ upstream โดยตรง เก็บ regression tests ไว้ |
+| LP-006 — Gemini schema | KEPT | upstream ยังไม่ strip `errorMessage` / `errorMessages` และยังลบชื่อ property ที่ตรงกับ keyword; เพิ่มทะเบียนให้แพตช์ `c31f4070` ที่ตกหล่น |
+| Bug A — empty-schema `reason` | ยังรอตัดสินใจ | upstream ยังแทรก required `reason` ใน schema ว่างเหมือนเดิม เป็นประเด็นค้างเดิม ไม่ได้เกิดจากการอัปเดตครั้งนี้ |
+
+Regression coverage เพิ่มการรักษา thinking และ native version ของ Opus 5.5 รวมถึง Combo `[1m]` → GLM `(high)` → capability aggregation ใหม่ ส่วน provider snapshot ปรับเฉพาะค่า Claude User-Agent ให้ตรง 2.1.280 ที่ upstream เปลี่ยนแล้ว
+
+**ผลตรวจ source:** 39 test files ผ่าน 500 tests และชุด `DefaultExecutor.buildHeaders` ผ่านอีก 17 tests (ข้าม 3 proxy-transport tests ที่อยู่นอกขอบเขตนี้); ESLint สำหรับไฟล์แพตช์/เทสที่แก้ผ่าน และ baseline checks ของ providers (83), aliases (117) และ OAuth URLs ผ่าน ไม่ได้อ้างว่าทั้ง test suite ผ่านทั้งหมด ยืนยัน Bug A ด้วย schema ว่างแล้วว่ายังได้ `properties.reason` และ `required: ["reason"]`
+
+## ประวัติการแก้ Claude สำหรับ v0.5.82
 
 | เส้นทาง | Patch | พฤติกรรมที่ต้องรักษาไว้ |
 |---|---|---|
@@ -48,6 +67,8 @@ curl --fail http://127.0.0.1:20128/api/health
 ## Patch 1: GLM-5.2 contextWindow ผิดทำให้ autocompact thrash เร็วผิดปกติ
 
 **Commit:** `b55f405e` · **ไฟล์ที่แก้:** `open-sse/providers/capabilities.js` · **วันที่:** 2026-07-30
+
+**v0.5.86:** ACTIVE / MODIFIED — เก็บเฉพาะ suffix lookup; provider override ด้านล่างเป็นประวัติและไม่ต้อง re-apply เพราะ upstream มี canonical GLM-5.2 1M / 131072 แล้ว ทดสอบด้วย `tests/unit/local-patch-routing.test.js`
 
 ### อาการ (Bug B)
 
@@ -273,7 +294,7 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 
 ## LP-005: Opus 5.5 in the dashboard Add Model test
 
-**Status:** ACTIVE · **Commit:** `83bda598` · **Date:** 2026-09-23
+**Status:** UPSTREAM_FIXED · **Original commit:** `83bda598` · **Date:** 2026-09-23 · **Fixed upstream:** `cbffeb97` (included in v0.5.86)
 
 **Scope:** Dashboard Add Model/Test and other translated requests without an incoming Claude Code identity. Complements LP-004, which only forwards an existing native client User-Agent.
 
@@ -299,7 +320,21 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 - The identical post-install Add Model test returned `{"ok":true,"latencyMs":2449,"error":null,"status":200}` for `cc/claude-opus-5-5`. This is a direct model probe, not a Combo fallback.
 - User acceptance on 2026-09-23: confirmed the Add Model operation now works after installing LP-005.
 
-**Upstream tracking:** No upstream issue/PR filed for LP-005. Retain until the compatibility default meets Opus 5.5's requirement in both generated headers and billing attribution. Preserve LP-004's native passthrough separately.
+**Upstream tracking:** Fixed by `cbffeb97`: the shared default is 2.1.280, used by both generated headers and billing attribution. As of v0.5.86, `open-sse/providers/shared.js` matches upstream and no separate LP-005 implementation remains. Keep its regression coverage and preserve LP-004's native passthrough separately.
+
+---
+
+## LP-006: Gemini tool-schema annotations (registered retrospectively)
+
+**Status:** ACTIVE · **Commit:** `c31f4070` · **Implemented:** 2026-09-20 · **Registered:** 2026-09-24
+
+**Root cause:** Gemini/Antigravity reject schema annotations such as `errorMessage` and `errorMessages`. The old recursive cleaner also treated keys under `properties` as schema keywords, deleting legitimate parameters named `errorMessage`, `title`, or `format`.
+
+**Change:** Strip unsupported annotations recursively while preserving actual property names. Applies to the shared Gemini schema cleaner; provider credentials and prompts are unchanged.
+
+**Files:** `open-sse/translator/formats/gemini.js`, `tests/unit/gemini-schema-clean-errormessage.test.js`.
+
+**v0.5.86 audit:** KEPT. Neither fix exists in upstream `39e36d3d`. Four existing regression tests pass, including OpenAI tool → Gemini function declarations. No upstream issue/PR has been filed for this local patch.
 
 ---
 

@@ -22,9 +22,6 @@ export function mapStainlessArch() {
 
 // Anthropic API version (single source — reused across claude-format providers/executors)
 export const ANTHROPIC_API_VERSION = "2023-06-01";
-// Compatibility default for dashboard probes and translated requests, which
-// have no native CLI version. Opus 5.5 requires at least 2.1.280. Native Claude
-// Code requests keep their actual User-Agent in DefaultExecutor.buildHeaders.
 export const CLAUDE_CLI_VERSION = "2.1.280";
 
 // Shared Claude-compatible API headers (reused across claude-format providers)

@@ -84,6 +84,8 @@ describe("Claude Code native combo thinking round-trip", () => {
   it.each([
     ["claude-opus-5(max)", "enabled"],
     ["claude-opus-5(max)", "adaptive"],
+    ["claude-opus-5-5(max)", "enabled"],
+    ["claude-opus-5-5(max)", "adaptive"],
     ["claude-fable-5(max)", "enabled"],
     ["claude-fable-5(max)", "adaptive"],
     ["claude-fable-5-1(xhigh)", "enabled"],

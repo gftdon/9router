@@ -61,7 +61,7 @@ describe("Claude Code version forwarding", () => {
       .toMatch(/^x-anthropic-billing-header: cc_version=2\.1\.280\./);
   });
 
-  it.each(["claude-opus-5", "claude-fable-5-1"])(
+  it.each(["claude-opus-5", "claude-opus-5-5", "claude-fable-5-1"])(
     "keeps the actual CLI version through Combo to the %s upstream request", async (model) => {
       const userAgent = "claude-cli/2.1.280 (external, cli)";
       const attribution = "x-anthropic-billing-header: cc_version=2.1.280.fixture; cc_entrypoint=cli;";

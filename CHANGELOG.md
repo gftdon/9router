@@ -6,6 +6,11 @@
 - Mark LP-005 as upstream-fixed by the Opus 5.5 compatibility update. Keep its regression tests and add Opus 5.5 native round-trip coverage.
 - Audit every local patch in `LOCAL_PATCHES.md`, including the previously unlisted Gemini patch. Empty-schema `reason` injection remains a separate unresolved issue.
 
+### Local validation
+- 517 targeted tests, patch/test lint, and provider/alias/OAuth baseline checks passed. Build/pack and global installation of v0.5.86 succeeded; all 503 installed server JavaScript files match the build and health checks pass.
+- The Opus 5.5 Add Model probe returned HTTP 200 / `ok: true`. Claude Code 2.1.281 completed two sequential Read calls through both direct Opus 5.5 and the existing `9-orchestrator[1m]` Combo, with Opus 5.5 confirmed as the responding model.
+- One initial native probe returned a synthetic error without a captured cause; subsequent direct probes passed twice, followed by the Combo probe. This does not establish that all intermittent refusals are resolved. See `LOCAL_PATCHES.md` for the audit, deployment receipt, and remaining Gemini empty-schema issue.
+
 ## Features
 - **Xiaomi MiMo**: server-assisted desktop login for headless/Docker deployments, five account clusters (cn/sgp/ams/ru/in), and v2.6 pro/flash/pro-ultraspeed models with dual-route (account service vs. cloud API)
 - **Claude**: add Claude Opus 5.5 support

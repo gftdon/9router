@@ -13,7 +13,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
-| — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | ⏳ รอตัดสินใจ |
+| — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
@@ -29,11 +29,27 @@ Upstream: tag `v0.5.86`, commit `39e36d3d0c849e0e01dfeacddf111edf892448fc`. เ�
 | LP-004 — native client version | KEPT | upstream ยังใช้ static User-Agent ใน executor โดยไม่ส่งค่าจริงจาก native client |
 | LP-005 — dashboard version | UPSTREAM_FIXED | `cbffeb97` เปลี่ยน `CLAUDE_CLI_VERSION` เป็น 2.1.280 และเพิ่ม Opus 5.5; ใช้ไฟล์ `shared.js` ของ upstream โดยตรง เก็บ regression tests ไว้ |
 | LP-006 — Gemini schema | KEPT | upstream ยังไม่ strip `errorMessage` / `errorMessages` และยังลบชื่อ property ที่ตรงกับ keyword; เพิ่มทะเบียนให้แพตช์ `c31f4070` ที่ตกหล่น |
-| Bug A — empty-schema `reason` | ยังรอตัดสินใจ | upstream ยังแทรก required `reason` ใน schema ว่างเหมือนเดิม เป็นประเด็นค้างเดิม ไม่ได้เกิดจากการอัปเดตครั้งนี้ |
+| Bug A — empty-schema `reason` | NEEDS_REVIEW | upstream ยังแทรก required `reason` ใน schema ว่างเหมือนเดิม เป็นประเด็นค้างเดิม ไม่ได้เกิดจากการอัปเดตครั้งนี้ |
 
 Regression coverage เพิ่มการรักษา thinking และ native version ของ Opus 5.5 รวมถึง Combo `[1m]` → GLM `(high)` → capability aggregation ใหม่ ส่วน provider snapshot ปรับเฉพาะค่า Claude User-Agent ให้ตรง 2.1.280 ที่ upstream เปลี่ยนแล้ว
 
 **ผลตรวจ source:** 39 test files ผ่าน 500 tests และชุด `DefaultExecutor.buildHeaders` ผ่านอีก 17 tests (ข้าม 3 proxy-transport tests ที่อยู่นอกขอบเขตนี้); ESLint สำหรับไฟล์แพตช์/เทสที่แก้ผ่าน และ baseline checks ของ providers (83), aliases (117) และ OAuth URLs ผ่าน ไม่ได้อ้างว่าทั้ง test suite ผ่านทั้งหมด ยืนยัน Bug A ด้วย schema ว่างแล้วว่ายังได้ `properties.reason` และ `required: ["reason"]`
+
+### Build / install / live verification (2026-09-24)
+
+- รวม upstream และแพตช์ใน merge commit `a24a17ff`; root manifest, CLI manifest และแพ็กเกจ global เป็น **0.5.86** ตรงกัน
+- `npm run cli:pack` ผ่าน ได้ `9router-0.5.86.tgz` (15,247,433 bytes); SHA-256 `90b13a080170334c0af8cd63a6e82e6f9e9728981f4e73a791babdbb09b6c1df`; build ID `egj0Qlh6HIzPwE91jYWc2`
+- ตรวจ executor ในแพ็กเกจจริง: native User-Agent ยังคงเวอร์ชันที่ส่งมา และกรณีไม่มี native identity ใช้ `claude-cli/2.1.280 (external, sdk-cli)`
+- สำรองแพ็กเกจเดิมและ SQLite snapshot ที่ `/tmp/9router-before-v0586-20260924/` (directory mode 0700, database mode 0600) ก่อนติดตั้ง global และรีสตาร์ต LaunchAgent เดิม โดยไม่แก้ plist
+- เริ่มแรกตัวนับรายงานงานค้าง 2 กลุ่ม รวม 15 requests จึงรอก่อน ผู้ใช้ยืนยันว่าพักงานและให้ดำเนินการแล้ว จึงรีสตาร์ตตามการยืนยันนั้น ไม่ได้อ้างว่าตัวนับลดเป็นศูนย์ก่อนรีสตาร์ต
+- Runtime เปลี่ยน listener PID 3657 → 4571 ณ เวลาติดตั้ง; `/api/health` คืน `{"ok":true}` หลังเริ่มและหลัง live probes; server JavaScript ทั้ง **503 ไฟล์** ใน global ตรงกับแพ็กเกจที่ build
+- Combo ทั้ง 7 รายการ (ชื่อและ model list) เหมือนเดิมก่อน/หลังติดตั้งและหลัง live probes; provider connection count ยังคง 9 รายการ ไฟล์งานเดิมของผู้ใช้ 5 ไฟล์ใน checkout มี SHA-256 เดิมและไม่ถูกรวมใน commit นี้
+- **Add Model:** `POST /api/models/test` ด้วย `cc/claude-opus-5-5` คืน `{"ok":true,"latencyMs":2777,"error":null,"status":200}`
+- **Native Claude Code 2.1.281:** direct `cc/claude-opus-5-5` ผ่านสองครั้งติดต่อกัน โดยแต่ละครั้งใช้ `Read` ต่อเนื่อง 2 calls และอ่าน marker จากไฟล์ที่สองได้; response model เป็น `claude-opus-5-5`
+- **Combo จริง:** `9-orchestrator[1m]` ผ่าน native CLI และ `Read` 2 calls; response model เป็น `claude-opus-5-5` จึงไม่ได้สำเร็จจาก Kimi fallback
+- **ข้อจำกัด:** native probe ครั้งแรกคืน synthetic error ก่อนเริ่ม tool แต่ตัวบันทึกในครั้งนั้นไม่ได้เก็บข้อความสาเหตุ จึงยังสรุปสาเหตุไม่ได้; direct probes ที่ตรวจซ้ำสองครั้งและ Combo probe ผ่าน ผลนี้ไม่ยืนยันว่าปัญหา refusal เป็นครั้งคราวทุกแบบหายแล้ว
+
+Local evidence: `/tmp/9router-v0586-tests.json`, `/tmp/9router-v0586-build-20260924.log`, `/tmp/9router-v0586-deployment-receipt.json`, `/tmp/9router-v0586-native-probe-result.json`, `/tmp/9router-v0586-combo-probe-result.json` (เป็นไฟล์ชั่วคราว; ผลสำคัญบันทึกไว้ข้างต้นแล้ว)
 
 ## ประวัติการแก้ Claude สำหรับ v0.5.82
 
@@ -342,7 +358,9 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 
 ### Bug A: `reason` injection ใน tool schema ว่าง (gemini/antigravity path)
 
-**สถานะ:** ยืนยัน root cause แล้ว ยังไม่ได้แก้ · **ไฟล์:** `open-sse/translator/formats/gemini.js:353-378`
+**สถานะ:** NEEDS_REVIEW — ประเด็นเดิมที่ยังไม่ได้แก้ · **ไฟล์:** `open-sse/translator/formats/gemini.js`, `cleanJSONSchemaForAntigravity()`
+
+**ตรวจซ้ำ v0.5.86 (2026-09-24):** การเรียก cleaner ด้วย `{type: "object", properties: {}}` ยังได้ `properties.reason` และ `required: ["reason"]`; ยืนยันได้ในระดับ schema transformation รอบนี้ ไม่ได้รัน live Gemini tool-call เพื่อยืนยัน error ฝั่ง Claude Code ซ้ำ ควรแยกแก้และทดสอบ empty-tool round-trip ก่อนปิดประเด็น
 
 - `cleanJSONSchemaForAntigravity` ฝัง `reason` เป็น **required** field ลง tool ที่ schema ว่าง (เช่น `TaskList`)
 - model เห็น schema บอก `reason` required → ส่ง `{"reason":"..."}` กลับมา

@@ -1,3 +1,0 @@
-# tests/unit/antigravity-weekly-dashboard.test.js
-
-_No extracted symbols in this file._

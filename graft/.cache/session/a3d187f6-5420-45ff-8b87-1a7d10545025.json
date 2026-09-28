@@ -1,9 +1,0 @@
-{
-  "lastQuery": "อัพเดท 9router เวอร์ชั่นล่าสุดให้ที v0.5.91 แล้วเช็ค upstream กับดูไฟล์ LOCAL_PATCHES.md ให้ด้วย",
-  "perAgentQuery": {},
-  "graftReads": 0,
-  "sourceReads": 0,
-  "savedTokens": 0,
-  "injectedPointers": [],
-  "nudges": 1
-}

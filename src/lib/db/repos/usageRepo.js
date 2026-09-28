@@ -132,12 +132,25 @@ async function ensureRingInitialized() {
   } catch {}
 }
 
+// A model with no pricing entry records cost $0, which is indistinguishable in
+// the dashboard from a genuinely free one — that is how the whole gpt-6 family
+// billed as free for weeks. Warn once per model so the next gap is visible; a
+// Set keeps this off the hot path at thousands of requests a day.
+const warnedMissingPricing = new Set();
+
 async function calculateCost(provider, model, tokens) {
   if (!tokens || !provider || !model) return 0;
   try {
     const { getPricingForModel } = await import("./pricingRepo.js");
     const pricing = await getPricingForModel(provider, model);
-    if (!pricing) return 0;
+    if (!pricing) {
+      const key = `${provider}|${model}`;
+      if (!warnedMissingPricing.has(key)) {
+        warnedMissingPricing.add(key);
+        console.warn(`[usage] no pricing entry for ${key} — recording cost $0`);
+      }
+      return 0;
+    }
 
     // Delegate the actual math to the single source of truth (avoids the two
     // copies drifting apart — see open-sse/providers/pricing.js for the

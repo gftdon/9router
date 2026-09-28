@@ -1,0 +1,16 @@
+# open-sse/services/accountFallback.js
+
+- getQuotaCooldown · function · L9-L13 — function getQuotaCooldown(backoffLevel = 0)
+- checkFallbackError · function · L23-L64 — function checkFallbackError(status, errorText, backoffLevel = 0)
+- isAccountUnavailable · function · L69-L72 — function isAccountUnavailable(unavailableUntil)
+- getUnavailableUntil · function · L77-L79 — function getUnavailableUntil(cooldownMs)
+- getEarliestRateLimitedUntil · function · L86-L97 — function getEarliestRateLimitedUntil(accounts)
+- formatRetryAfter · function · L104-L117 — function formatRetryAfter(rateLimitedUntil)
+- getModelLockKey · function · L126-L128 — function getModelLockKey(model)
+- isModelLockActive · function · L134-L139 — function isModelLockActive(connection, model)
+- getEarliestModelLockUntil · function · L145-L156 — function getEarliestModelLockUntil(connection)
+- buildModelLockUpdate · function · L161-L164 — function buildModelLockUpdate(model, cooldownMs)
+- buildClearModelLocksUpdate · function · L169-L175 — function buildClearModelLocksUpdate(connection)
+- filterAvailableAccounts · function · L180-L190 — function filterAvailableAccounts(accounts, excludeId = null)
+- resetAccountState · function · L198-L207 — function resetAccountState(account)
+- applyErrorState · function · L216-L229 — function applyErrorState(account, status, errorText)

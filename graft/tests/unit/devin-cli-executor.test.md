@@ -1,0 +1,18 @@
+# tests/unit/devin-cli-executor.test.js
+
+- makeFakeChild · function · L18-L106 — function makeFakeChild()
+- send · function · L43-L44 — send = (obj)
+- handle · function · L46-L103 — function handle(msg)
+- runExecute · function · L108-L131 — async function runExecute(credentials = {})
+- debug · method · L121-L121 — debug()
+- info · method · L121-L121 — info()
+- debug · method · L169-L169 — debug()
+- info · method · L169-L169 — info()
+- debug · method · L272-L272 — debug()
+- info · method · L272-L272 — info()
+- send · function · L301-L301 — send = (o)
+- handle · function · L302-L318 — function handle(msg)
+- debug · method · L328-L328 — debug()
+- info · method · L328-L328 — info()
+- debug · method · L425-L425 — debug()
+- info · method · L425-L425 — info()

@@ -1,0 +1,18 @@
+# cli/src/cli/menus/providers.js
+
+- getAuthType · function · L160-L162 — function getAuthType(providerId)
+- countConnectionsByProvider · function · L169-L176 — function countConnectionsByProvider(connections)
+- showProvidersMenu · function · L182-L253 — async function showProvidersMenu(breadcrumb = [])
+- buildProviderHeader · function · L260-L281 — function buildProviderHeader(providerId)
+- showProviderDetail · function · L290-L325 — async function showProviderDetail(providerId, authType, allConnections, breadcrumb = [])
+- showConnectionActions · function · L333-L394 — async function showConnectionActions(connection, providerId, breadcrumb = [])
+- handleAddConnection · function · L409-L422 — async function handleAddConnection(providerId, authType)
+- handleAddApiKeyConnection · function · L428-L462 — async function handleAddApiKeyConnection(providerId)
+- handleAddOAuthConnection · function · L469-L561 — async function handleAddOAuthConnection(providerId)
+- handleAddDeviceCodeConnection · function · L567-L642 — async function handleAddDeviceCodeConnection(providerId)
+- showCustomProvidersMenu · function · L657-L680 — async function showCustomProvidersMenu(breadcrumb = [])
+- showCustomNodeDetail · function · L685-L728 — async function showCustomNodeDetail(node, breadcrumb = [])
+- showCustomNodeConnections · function · L733-L761 — async function showCustomNodeConnections(node, breadcrumb = [])
+- handleAddCustomNodeConnection · function · L766-L781 — async function handleAddCustomNodeConnection(node)
+- handleAddCustomNode · function · L786-L826 — async function handleAddCustomNode()
+- handleEditCustomNode · function · L831-L858 — async function handleEditCustomNode(node)

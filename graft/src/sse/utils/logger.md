@@ -1,0 +1,17 @@
+# src/sse/utils/logger.js
+
+- formatTime · function · L12-L14 — function formatTime()
+- nextTag · function · L21-L25 — function nextTag()
+- tagForSession · function · L28-L33 — function tagForSession(seed)
+- line · function · L36-L39 — function line(tag, symbol, message)
+- errorLine · function · L42-L44 — function errorLine(tag, symbol, message)
+- fmtThink · function · L47-L57 — function fmtThink(intent)
+- formatData · function · L59-L67 — function formatData(data)
+- debug · function · L69-L74 — function debug(tag, message, data)
+- info · function · L76-L81 — function info(tag, message, data)
+- warn · function · L83-L88 — function warn(tag, message, data)
+- error · function · L90-L95 — function error(tag, message, data)
+- request · function · L97-L100 — function request(method, path, extra)
+- response · function · L102-L106 — function response(status, duration, extra)
+- stream · function · L108-L111 — function stream(event, data)
+- maskKey · function · L114-L117 — function maskKey(key)

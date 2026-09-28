@@ -1,0 +1,16 @@
+# src/lib/headroom/process.js
+
+- ensureDir · function · L14-L16 — function ensureDir()
+- readPid · function · L18-L23 — function readPid()
+- writePid · function · L25-L28 — function writePid(pid)
+- clearPid · function · L30-L32 — function clearPid()
+- isPidAlive · function · L35-L38 — function isPidAlive(pid)
+- getManagedPid · function · L40-L43 — function getManagedPid()
+- extrasProxyArgs · function · L48-L53 — function extrasProxyArgs({ codeAware, kompress } = {})
+- startHeadroomProxy · function · L55-L110 — async function startHeadroomProxy({ port = DEFAULT_PORT, codeAware = false, kompress = true } = {})
+- stopHeadroomProxy · function · L112-L131 — function stopHeadroomProxy()
+- restartHeadroomProxy · function · L135-L150 — async function restartHeadroomProxy(opts = {})
+- getHeadroomLogTail · function · L152-L159 — function getHeadroomLogTail(maxLines = 200)
+- installHeadroomExtras · function · L166-L209 — async function installHeadroomExtras(extras = [])
+- uninstallHeadroomExtras · function · L213-L251 — async function uninstallHeadroomExtras(extras = [])
+- getInstallLogTail · function · L254-L260 — function getInstallLogTail(maxLines = 15)

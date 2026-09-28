@@ -1,0 +1,14 @@
+{
+  "lastQuery": "Read package.json and cli/package.json using the Read tool. Report their two package versions in one short sentence.\nimport subprocess,os,json,tempfile\np=os.path.expanduser('~/.claude/settings.json.9router');d=json.load(open(p));env=os.environ.copy();env.update(d['env']);env['CLAUDE_CODE_MAX_RETRIES']='0'\nout=tempfile.mkdtemp(prefix='9router-refusal-probe-');os.chmod(out,0o700);env['OTEL_LOG_RAW_API_BODIES']='file:'+out\nprint('CAPTURE_DIR',out,flush=True)\ncmd=['claude','--settings',p,'--model','9-orchestrator','--tools','Read','--allowedTools','Read','--no-session-persistence','--output-format','stream-json','--verbose','-p','Read package.json and cli/package.json using the Read tool. Report their two package versions in one short sentence.']\ntry:\n r=subprocess.run(cmd,cwd='/Volumes/Ext_SS990Pro/Dev/9router',env=env,capture_output=True,text=True,timeout=55)\n print('EXIT',r.returncode,flush=True)\n for line in r.stdout.splitlines():\n  try:x=json.loads(line)\n  except:continue\n  if x.get('type')=='result':print(json.dumps({k:x[k] for k in ['type','subtype','is_error','result','duration_ms','num_turns'] if k in x}),flush=True)\n  if x.get('type')=='assistant':\n   m=x.get('message',{});print('ASSISTANT',json.dumps({'model':m.get('model'),'stop_reason':m.get('stop_reason'),'blocks':[{'type':b.get('type'),**({'tool':b.get('name')} if b.get('type')=='tool_use' else {}),**({'text':b.get('text','')[:300]} if b.get('type')=='text' else {})} for b in m.get('content',[])]}),flush=True)\n if r.stderr: print('STDERR',r.stderr[-300:],flush=True)\nexcept subprocess.TimeoutExpired: print('TIMEOUT_55S',flush=True)\nprint('CAPTURE_COUNT',len(os.listdir(out)),flush=True)",
+  "perAgentQuery": {},
+  "graftReads": 0,
+  "sourceReads": 2,
+  "savedTokens": 0,
+  "injectedPointers": [
+    "cli/scripts/buildMitm.js:L23-L54",
+    "cli/src/cli/commands/xaiVideo.js:L128-L150",
+    "cli/src/cli/commands/xaiVideo.js:L178-L207"
+  ],
+  "nudges": 0,
+  "host": "claude-code"
+}

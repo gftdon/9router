@@ -1,0 +1,23 @@
+# open-sse/executors/antigravity.js
+
+- sanitizeFunctionName · function · L13-L18 — function sanitizeFunctionName(name)
+- stripBlacklisted · function · L54-L56 — stripBlacklisted = obj
+- isImageModel · function · L66-L69 — function isImageModel(model)
+- parseImageConfig · function · L74-L90 — function parseImageConfig(model)
+- gcd · function · L84-L84 — gcd = (a, b)
+- uuidFromSeed · function · L92-L98 — function uuidFromSeed(seed)
+- buildIdeRequestId · function · L100-L111 — function buildIdeRequestId({ body, request, credentials, model, requestType })
+- AntigravityExecutor · class · L113-L541 — class AntigravityExecutor extends BaseExecutor
+- constructor · method · L114-L116 — constructor()
+- buildUrl · method · L118-L125 — buildUrl(model, stream, urlIndex = 0)
+- buildHeaders · method · L129-L135 — buildHeaders(credentials, stream = true, sessionId = null)
+- transformRequest · method · L137-L305 — transformRequest(model, body, stream, credentials)
+- refreshCredentials · method · L307-L337 — async refreshCredentials(credentials, log, proxyOptions = null)
+- generateProjectId · method · L339-L343 — generateProjectId()
+- generateSessionId · method · L345-L347 — generateSessionId()
+- parseRetryHeaders · method · L349-L378 — parseRetryHeaders(headers)
+- parseRetryFromErrorMessage · method · L382-L394 — parseRetryFromErrorMessage(errorMessage)
+- extractErrorMessage · method · L396-L403 — extractErrorMessage(errorJson, bodyText = "")
+- isTransientAntigravityError · method · L405-L409 — isTransientAntigravityError(status, message)
+- computeRetryDelay · method · L414-L439 — async computeRetryDelay(response, attempt)
+- cloakTools · method · L447-L540 — static cloakTools(body, clientTool = null)

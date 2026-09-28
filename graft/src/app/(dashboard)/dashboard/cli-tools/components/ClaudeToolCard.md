@@ -1,0 +1,15 @@
+# src/app/(dashboard)/dashboard/cli-tools/components/ClaudeToolCard.js
+
+- withContextMarker · function · L67-L70 — withContextMarker = (value, enabled)
+- handleOneMContextToggle · function · L74-L80 — handleOneMContextToggle = (enabled)
+- getConfigStatus · function · L84-L90 — getConfigStatus = ()
+- handleCcFilterNamingToggle · function · L131-L139 — handleCcFilterNamingToggle = async (e)
+- fetchModelAliases · function · L141-L149 — fetchModelAliases = async ()
+- checkClaudeStatus · function · L175-L187 — checkClaudeStatus = async ()
+- getEffectiveBaseUrl · function · L189-L192 — getEffectiveBaseUrl = ()
+- getDisplayUrl · function · L194-L197 — getDisplayUrl = ()
+- handleApplySettings · function · L199-L242 — handleApplySettings = async ()
+- handleResetSettings · function · L244-L265 — handleResetSettings = async ()
+- openModelSelector · function · L267-L270 — openModelSelector = (alias)
+- handleModelSelect · function · L272-L274 — handleModelSelect = (model)
+- getManualConfigs · function · L277-L296 — getManualConfigs = ()

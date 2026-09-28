@@ -1,0 +1,15 @@
+# src/shared/services/initializeApp.js
+
+- initializeApp · function · L52-L80 — async function initializeApp()
+- cleanup · function · L57-L62 — cleanup = ()
+- runHeavyStartup · function · L82-L121 — async function runHeavyStartup()
+- hasQuotaAutoPingEnabled · function · L123-L126 — function hasQuotaAutoPingEnabled(settings)
+- autoStartMitm · function · L128-L159 — async function autoStartMitm(settings)
+- safeRestartTunnel · function · L167-L196 — async function safeRestartTunnel(reason)
+- safeRestartTailscale · function · L198-L237 — async function safeRestartTailscale(reason)
+- startWatchdog · function · L241-L248 — function startWatchdog()
+- stopWatchdog · function · L250-L254 — function stopWatchdog()
+- getNetworkFingerprint · function · L258-L271 — function getNetworkFingerprint()
+- startNetworkMonitor · function · L273-L315 — function startNetworkMonitor()
+- stopNetworkMonitor · function · L318-L324 — function stopNetworkMonitor()
+- configureTunnelMonitoring · function · L326-L334 — function configureTunnelMonitoring(settings)

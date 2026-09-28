@@ -1,0 +1,15 @@
+# src/lib/updater/updater.js
+
+- getDataDir · function · L24-L30 — function getDataDir()
+- pushLog · function · L50-L56 — function pushLog(line)
+- persistStatus · function · L58-L60 — function persistStatus()
+- setPhase · function · L62-L65 — function setPhase(phase)
+- isAppPortBusy · function · L91-L104 — function isAppPortBusy()
+- done · function · L94-L97 — done = (busy)
+- waitForAppExit · function · L107-L125 — async function waitForAppExit()
+- sleep · function · L127-L129 — function sleep(ms)
+- runInstall · function · L131-L173 — function runInstall()
+- openBrowser · function · L175-L181 — function openBrowser(url)
+- waitForAppAndOpenBrowser · function · L184-L196 — async function waitForAppAndOpenBrowser()
+- relaunchApp · function · L198-L220 — function relaunchApp()
+- finalize · function · L222-L235 — function finalize(success, exitCode, error)

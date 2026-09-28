@@ -1,0 +1,17 @@
+# src/app/(dashboard)/dashboard/token-saver/TokenSaverClient.js
+
+- TokenSaverClient · function · L13-L530 — function TokenSaverClient()
+- patchSetting · function · L83-L93 — patchSetting = async (patch)
+- handleRtkEnabled · function · L95-L106 — handleRtkEnabled = async (value)
+- handleCavemanEnabled · function · L108-L111 — handleCavemanEnabled = (value)
+- handleHeadroomEnabled · function · L113-L118 — handleHeadroomEnabled = (value)
+- handleHeadroomUrlBlur · function · L120-L125 — handleHeadroomUrlBlur = async ()
+- togglePendingExtra · function · L210-L214 — togglePendingExtra = (extra)
+- tick · function · L220-L228 — tick = async ()
+- handleCavemanLevel · function · L342-L345 — handleCavemanLevel = (level)
+- handlePonytailEnabled · function · L347-L350 — handlePonytailEnabled = (value)
+- handlePonytailLevel · function · L352-L355 — handlePonytailLevel = (level)
+- handlePxpipeEnabled · function · L399-L402 — handlePxpipeEnabled = (value)
+- handlePxpipeMinCharsBlur · function · L404-L408 — handlePxpipeMinCharsBlur = ()
+- handleHeadroomTimeoutBlur · function · L410-L415 — handleHeadroomTimeoutBlur = ()
+- loadSettings · function · L418-L440 — loadSettings = async ()

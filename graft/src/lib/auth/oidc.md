@@ -1,0 +1,17 @@
+# src/lib/auth/oidc.js
+
+- trimTrailingSlashes · function · L14-L16 — function trimTrailingSlashes(value)
+- normalizeScopes · function · L18-L20 — function normalizeScopes(value)
+- getPublicOrigin · function · L22-L41 — function getPublicOrigin(request)
+- isOidcConfigured · function · L43-L49 — function isOidcConfigured(settings)
+- getOidcRuntimeConfig · function · L51-L63 — async function getOidcRuntimeConfig()
+- fetchOidcDiscovery · function · L65-L72 — async function fetchOidcDiscovery(issuerUrl)
+- createPkcePair · function · L74-L78 — function createPkcePair()
+- createOidcState · function · L80-L82 — function createOidcState()
+- createOidcNonce · function · L84-L86 — function createOidcNonce()
+- buildOidcAuthorizationUrl · function · L88-L107 — function buildOidcAuthorizationUrl({ authorizationEndpoint, clientId, redirectUri, scopes = DEFAULT_SCOPES, state, nonce, codeChallenge, })
+- exchangeOidcCode · function · L109-L142 — async function exchangeOidcCode({ tokenEndpoint, clientId, clientSecret, code, redirectUri, codeVerifier, })
+- probeOidcClientSecret · function · L144-L210 — async function probeOidcClientSecret({ tokenEndpoint, clientId, clientSecret, redirectUri, })
+- verifyOidcIdToken · function · L212-L226 — async function verifyOidcIdToken({ idToken, issuer, audience, jwksUri, nonce, })
+- pickOidcDisplayName · function · L228-L230 — function pickOidcDisplayName(payload = {})
+- pickOidcEmail · function · L232-L234 — function pickOidcEmail(payload = {})

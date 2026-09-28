@@ -1,0 +1,14 @@
+{
+  "nodeCount": 5890,
+  "edgeCount": 14599,
+  "languages": [
+    "javascript"
+  ],
+  "totalCount": 5890,
+  "readyCount": 0,
+  "staleCount": 0,
+  "dirty": false,
+  "syncing": false,
+  "syncedAt": "2026-09-20T07:42:47.349Z",
+  "lastFile": ".gitignore"
+}

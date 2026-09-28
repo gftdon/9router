@@ -1,0 +1,17 @@
+# open-sse/handlers/search/normalizers.js
+
+- makeResult · function · L8-L31 — function makeResult(providerId, item, idx, now)
+- normalizeSerper · function · L33-L42 — function normalizeSerper(data, _query, searchType)
+- normalizeBrave · function · L44-L59 — function normalizeBrave(data, _query, searchType)
+- normalizePerplexity · function · L61-L69 — function normalizePerplexity(data, _query, _searchType)
+- normalizeExa · function · L71-L90 — function normalizeExa(data, _query, _searchType)
+- normalizeTavily · function · L92-L108 — function normalizeTavily(data, _query, _searchType)
+- normalizeGooglePse · function · L110-L124 — function normalizeGooglePse(data, _query, _searchType)
+- normalizeLinkup · function · L126-L141 — function normalizeLinkup(data, _query, _searchType)
+- normalizeSearchApi · function · L143-L160 — function normalizeSearchApi(data, _query, _searchType)
+- normalizeYouCom · function · L162-L184 — function normalizeYouCom(data, _query, searchType)
+- normalizeSearxng · function · L186-L200 — function normalizeSearxng(data, _query, _searchType)
+- normalizeXquik · function · L202-L241 — function normalizeXquik(data, _query, _searchType)
+- normalizeOllamaSearch · function · L243-L258 — function normalizeOllamaSearch(data, _query, _searchType)
+- normalizeGlmSearch · function · L260-L283 — function normalizeGlmSearch(data, _query, _searchType)
+- normalizeSearchResponse · function · L305-L308 — function normalizeSearchResponse(providerId, data, query, searchType)

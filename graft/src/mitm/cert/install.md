@@ -1,0 +1,17 @@
+# src/mitm/cert/install.js
+
+- getLinuxCertConfig · function · L21-L29 — function getLinuxCertConfig()
+- getCertFingerprint · function · L33-L37 — function getCertFingerprint(certPath)
+- checkCertInstalled · function · L42-L46 — async function checkCertInstalled(certPath)
+- checkCertInstalledMac · function · L48-L66 — function checkCertInstalledMac(certPath)
+- checkCertInstalledWindows · function · L68-L81 — function checkCertInstalledWindows(certPath)
+- installCert · function · L86-L104 — async function installCert(sudoPassword, certPath)
+- installCertMac · function · L106-L117 — async function installCertMac(sudoPassword, certPath)
+- installCertWindows · function · L119-L133 — async function installCertWindows(certPath)
+- uninstallCert · function · L138-L152 — async function uninstallCert(sudoPassword, certPath)
+- uninstallCertMac · function · L154-L163 — async function uninstallCertMac(sudoPassword, certPath)
+- uninstallCertWindows · function · L165-L174 — async function uninstallCertWindows()
+- checkCertInstalledLinux · function · L176-L180 — function checkCertInstalledLinux()
+- updateNssDatabases · function · L182-L224 — async function updateNssDatabases(certPath, action = 'add')
+- installCertLinux · function · L226-L247 — async function installCertLinux(sudoPassword, certPath)
+- uninstallCertLinux · function · L249-L267 — async function uninstallCertLinux(sudoPassword)

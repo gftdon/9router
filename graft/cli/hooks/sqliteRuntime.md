@@ -1,0 +1,16 @@
+# cli/hooks/sqliteRuntime.js
+
+- getDataDir · function · L18-L23 — function getDataDir()
+- getRuntimeDir · function · L25-L27 — function getRuntimeDir()
+- getRuntimeNodeModules · function · L29-L31 — function getRuntimeNodeModules()
+- ensureRuntimeDir · function · L33-L48 — function ensureRuntimeDir()
+- hasModule · function · L50-L52 — function hasModule(name)
+- isGlibcRuntime · function · L54-L56 — function isGlibcRuntime()
+- getBetterSqliteBinary · function · L59-L66 — function getBetterSqliteBinary()
+- isBetterSqliteBinaryValid · function · L68-L82 — function isBetterSqliteBinaryValid()
+- summarizeNpmError · function · L85-L96 — function summarizeNpmError(stderr = "")
+- runNpmInstall · function · L98-L109 — function runNpmInstall({ cwd, pkgs, extraArgs = [], timeout = 180000 })
+- npmInstall · function · L111-L124 — function npmInstall(pkgs, opts = {})
+- isSqlJsWasmValid · function · L131-L136 — function isSqlJsWasmValid()
+- ensureSqliteRuntime · function · L138-L161 — function ensureSqliteRuntime({ silent = false } = {})
+- buildEnvWithRuntime · function · L165-L171 — function buildEnvWithRuntime(baseEnv = process.env)

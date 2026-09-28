@@ -1,0 +1,15 @@
+# open-sse/shared/qoder/sse.js
+
+- num · function · L14-L17 — function num(v)
+- canonicalizeQoderUsage · function · L23-L68 — function canonicalizeQoderUsage(usage)
+- finishReasonOf · function · L70-L73 — function finishReasonOf(parsed)
+- hasValuableDelta · function · L75-L83 — function hasValuableDelta(parsed)
+- parseInner · function · L85-L97 — function parseInner(inner)
+- createQoderSseCoalescer · function · L105-L208 — function createQoderSseCoalescer({ model, encoder, sseDone })
+- emitJson · function · L112-L115 — emitJson = (controller, obj)
+- emitRaw · function · L117-L119 — emitRaw = (controller, text)
+- emitDone · function · L121-L125 — emitDone = (controller)
+- emitTerminal · function · L127-L139 — emitTerminal = (controller)
+- flush · function · L141-L147 — flush = (controller)
+- handleInner · function · L149-L199 — handleInner = (inner, controller)
+- doneEmitted · method · L204-L206 — get doneEmitted()

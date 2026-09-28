@@ -1,0 +1,17 @@
+# open-sse/translator/formats/claude.js
+
+- lastCacheableToolIndex · function · L19-L25 — function lastCacheableToolIndex(tools)
+- hasValidContent · function · L28-L48 — function hasValidContent(msg)
+- normalizeMessageContent · function · L53-L60 — function normalizeMessageContent(msg)
+- countCacheControlBlocks · function · L64-L76 — function countCacheControlBlocks(body)
+- capCacheControlBlocks · function · L82-L102 — function capCacheControlBlocks(body)
+- isHead · function · L83-L89 — isHead = (b)
+- fixToolUseOrdering · function · L107-L161 — function fixToolUseOrdering(messages)
+- handlesThinkingBlocks · function · L166-L168 — function handlesThinkingBlocks(provider)
+- buildThinkingPlaceholder · function · L170-L183 — function buildThinkingPlaceholder(provider)
+- hasForeignServerToolUseId · function · L192-L195 — function hasForeignServerToolUseId(block)
+- normalizeClaudePassthrough · function · L204-L322 — function normalizeClaudePassthrough(body, model = "")
+- markLastCacheableBlock · function · L326-L336 — function markLastCacheableBlock(msg)
+- anchorClaudeCache · function · L343-L410 — function anchorClaudeCache(body)
+- hoistToolResultImages · function · L418-L438 — function hoistToolResultImages(body)
+- prepareClaudeRequest · function · L440-L649 — function prepareClaudeRequest(body, provider = null, apiKey = null, connectionId = null, rawHeaders = null, sessionId = null)

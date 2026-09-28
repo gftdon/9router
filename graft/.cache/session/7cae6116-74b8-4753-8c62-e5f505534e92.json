@@ -1,0 +1,25 @@
+{
+  "lastQuery": "push เข้าของเราเองก่อน",
+  "perAgentQuery": {},
+  "graftReads": 0,
+  "sourceReads": 3,
+  "savedTokens": 0,
+  "injectedPointers": [
+    "tests/unit/grok-build-config.test.js",
+    "tests/unit/count-tokens.test.js:L5-L14",
+    "tests/unit/cli-build-artifacts.test.js:L25-L29",
+    "tests/unit/rtk.test.js:L103-L112",
+    "tests/unit/cli-build-artifacts.test.js",
+    "tests/unit/bulk-add-names.test.js",
+    "cli/hooks/trayRuntime.js",
+    "cli/src/cli/tray/tray.js",
+    "open-sse/executors/devin-cli.js:L199-L201",
+    "open-sse/translator/concerns/prefetch.js:L34-L41",
+    "src/lib/updater/updater.js:L50-L56"
+  ],
+  "nudges": 2,
+  "host": "claude-code",
+  "inputCostMicros": 15544407,
+  "inputTokensBilled": 11689932,
+  "lastBillingUuid": "9f9ea810-6a40-4145-832e-587d2a6b9050"
+}

@@ -1,0 +1,18 @@
+# src/lib/tunnel/cloudflare/cloudflared.js
+
+- getDownloadUrl · function · L43-L54 — function getDownloadUrl()
+- getDownloadStatus · function · L59-L61 — function getDownloadStatus()
+- downloadFile · function · L63-L115 — function downloadFile(url, dest)
+- isValidBinary · function · L120-L135 — function isValidBinary(filePath)
+- ensureCloudflared · function · L139-L143 — async function ensureCloudflared()
+- _ensureCloudflared · function · L145-L184 — async function _ensureCloudflared()
+- setUnexpectedExitHandler · function · L191-L193 — function setUnexpectedExitHandler(handler)
+- spawnCloudflared · function · L195-L269 — async function spawnCloudflared(tunnelToken)
+- handleLog · function · L216-L228 — handleLog = (data)
+- spawnQuickTunnel · function · L275-L404 — async function spawnQuickTunnel(localPort, onUrlUpdate)
+- cleanup · function · L284-L290 — cleanup = ()
+- getQuickTunnelUrlFromLog · function · L313-L327 — function getQuickTunnelUrlFromLog(message)
+- handleLog · function · L338-L361 — handleLog = (data)
+- killCloudflaredByPort · function · L408-L418 — function killCloudflaredByPort(port)
+- killCloudflared · function · L420-L438 — function killCloudflared(localPort)
+- isCloudflaredRunning · function · L440-L449 — function isCloudflaredRunning()

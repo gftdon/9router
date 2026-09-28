@@ -1,0 +1,20 @@
+# open-sse/executors/default.js
+
+- setAuth · function · L21-L23 — function setAuth(headers, spec, token)
+- applyAuth · function · L26-L37 — function applyAuth(headers, desc, credentials)
+- DefaultExecutor · class · L65-L335 — class DefaultExecutor extends BaseExecutor
+- constructor · method · L66-L68 — constructor(provider)
+- transformRequest · method · L70-L82 — transformRequest(model, body)
+- applyJsonSchemaFallback · method · L85-L102 — applyJsonSchemaFallback(body)
+- buildUrl · method · L104-L136 — buildUrl(model, stream, urlIndex = 0, credentials = null)
+- resolveAuthDescriptor · method · L139-L147 — resolveAuthDescriptor()
+- buildHeaders · method · L149-L207 — buildHeaders(credentials, stream = true, url, model, body = null)
+- refreshFromGrant · method · L211-L217 — refreshFromGrant(credentials, proxyOptions)
+- refreshCredentials · method · L219-L246 — async refreshCredentials(credentials, log, proxyOptions = null)
+- refreshWithJSON · method · L248-L257 — async refreshWithJSON(url, body, proxyOptions = null)
+- refreshWithForm · method · L259-L268 — async refreshWithForm(url, params, proxyOptions = null)
+- refreshIflow · method · L270-L280 — async refreshIflow(refreshToken, proxyOptions = null)
+- refreshKiro · method · L282-L291 — async refreshKiro(refreshToken, proxyOptions = null)
+- refreshCline · method · L293-L309 — async refreshCline(refreshToken, proxyOptions = null)
+- refreshKimi · method · L312-L329 — async refreshKimi(credentials, proxyOptions = null)
+- refreshKilocode · method · L331-L334 — async refreshKilocode(refreshToken, proxyOptions = null)

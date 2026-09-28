@@ -1,0 +1,15 @@
+# src/mitm/dns/dnsConfig.js
+
+- atomicWriteHostsWin · function · L14-L32 — function atomicWriteHostsWin(target, originalContent, newContent)
+- isSudoAvailable · function · L41-L49 — function isSudoAvailable()
+- canRunSudoWithoutPassword · function · L51-L59 — function canRunSudoWithoutPassword()
+- isSudoPasswordRequired · function · L61-L63 — function isSudoPasswordRequired()
+- execWithPassword · function · L69-L91 — function execWithPassword(command, password)
+- normalizeHostsContent · function · L96-L99 — function normalizeHostsContent(content)
+- flushDNS · function · L104-L111 — async function flushDNS(sudoPassword)
+- checkDNSEntry · function · L116-L125 — function checkDNSEntry(host = null)
+- checkAllDNSStatus · function · L130-L141 — function checkAllDNSStatus()
+- addDNSEntry · function · L146-L180 — async function addDNSEntry(tool, sudoPassword)
+- removeDNSEntry · function · L185-L215 — async function removeDNSEntry(tool, sudoPassword)
+- removeAllDNSEntries · function · L220-L228 — async function removeAllDNSEntries(sudoPassword)
+- removeAllDNSEntriesSync · function · L234-L252 — function removeAllDNSEntriesSync()

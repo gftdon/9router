@@ -14,6 +14,12 @@
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.91, rebased) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
 | — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | NEEDS_REVIEW |
+| `1df544ca` | `open-sse/providers/pricing.js` | LP-007: เรตตระกูล gpt-6 ตามราคาทางการ OpenAI | ACTIVE |
+| `99ec5852` | `open-sse/providers/pricing.js` | LP-008: resolve ราคาเมื่อ model id มี effort suffix | ACTIVE |
+| `b6298d96` | `open-sse/providers/pricing.js` | LP-009: gpt-5.6 sol/luna/terra ไม่ตก wildcard + เรตตรงทางการ | ACTIVE |
+| `d09abdcb` | `src/lib/db/repos/usageRepo.js` | LP-010: warn เมื่อไม่มี pricing entry (เลิกเงียบ) | ACTIVE |
+| `594fcba0` | `tests/vitest.config.js` | LP-011: บังคับ DATA_DIR แยกตอนรันเทส (กัน DB จริงโดนเขียน) | ACTIVE |
+| `cc176d22` | `scripts/backfill-usage-cost.mjs`, `src/lib/db/helpers/dateKey.js` | LP-012: สคริปต์ backfill ยอด cost ย้อนหลัง | ACTIVE |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
@@ -438,6 +444,103 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 **Files:** `open-sse/translator/formats/gemini.js`, `tests/unit/gemini-schema-clean-errormessage.test.js`.
 
 **v0.5.86 audit:** KEPT. Neither fix exists in upstream `39e36d3d`. Four existing regression tests pass, including OpenAI tool → Gemini function declarations. No upstream issue/PR has been filed for this local patch.
+
+---
+
+## LP-007 / LP-008 / LP-009: ยอด cost ของ gpt-6 (และ gpt-5.6 sol/luna/terra) ไม่ขึ้น
+
+**Status:** ACTIVE · **Commits:** `1df544ca`, `99ec5852`, `b6298d96` (+ test `5c34ee8f`) · **Implemented:** 2026-09-28
+
+**อาการ:** แดชบอร์ด Usage by Model แสดง `gpt-6-astra-medium` / `gpt-6-sol-high` เป็น `$0.00` ทุกคอลัมน์ ทั้งที่ token บันทึกครบ — รวม 16,723 request คิดเงินหายไป ~$2,784
+
+**Root cause:** `getPricingForModel()` คืน `null` แล้ว `usageRepo.calculateCost` เก็บ `cost = 0` ลง DB แบบเงียบๆ เหตุเพราะ
+1. `MODEL_PRICING` มี key เดียวของทั้งตระกูล คือ `"gpt-6-astra"` (ไม่มี `gpt-6-sol` / `gpt-6-luna` เลย) และ `PATTERN_PRICING` หยุดที่ `gpt-5.6-*` ไม่มี glob `gpt-6*`
+2. suffix `-low/-medium/-high/-xhigh` เป็น **client-facing id** — `open-sse/executors/codex.js` ตัดทิ้งเฉพาะตอนยิง upstream แต่ usage record เก็บ id เต็ม → lookup ไม่เจอ
+3. `gpt-5.6-sol-high` ตก wildcard `gpt-5.6-*` (2.50/15) แทนเรต sol จริง → คิดเงินต่ำไปครึ่งหนึ่งมาตลอด
+
+**หลักฐานชี้ขาด:** วันเดียวกัน provider เดียวกัน ต่างแค่ suffix — `2026-09-09` `gpt-6-astra` 629 req = $106.81 แต่ `gpt-6-astra-high` 218 req = $0.00
+
+**Change:**
+- LP-007 — เรตตระกูล gpt-6 ตาม <https://developers.openai.com/api/docs/pricing>: astra 10/1/50, sol 2/0.20/10, luna 0.10/0.01/0.50 ($/1M in/cached/out) **ของเดิม astra 5/30 ก็ผิด**
+- LP-008 — เพิ่ม step 5 ใน `getPricingForModel()`: ถ้าไม่เจอเลย ให้ตัด `-<level>` หรือ `(level)` ท้ายแล้ว resolve ใหม่ (effort เปลี่ยนจำนวน token ไม่ใช่เรตต่อ token) **วางท้ายสุดโดยเจตนา** — ยิงเฉพาะเคสที่เดิมคืน null จึงไม่แตะ tier `*-codex-high`/`*-codex-low` ที่แมตช์ pattern ไปก่อน แก้ `k3(max)` ของ kimi ให้ด้วย
+- LP-009 — เพิ่ม pattern `gpt-5.6-sol-*` / `-terra-*` / `-luna-*` เหนือ `gpt-5.6-*` และแก้เรตฐาน sol 4/0.40/20, terra 2/0.20/12, luna 0.20/0.02/1.20 (รวม `PROVIDER_PRICING.tokenrouter["openai/gpt-5.6-sol"]`)
+
+**Files:** `open-sse/providers/pricing.js`, `tests/unit/pricing-effort-suffix.test.js`
+
+**⚠️ เช็คตอน upgrade รอบหน้า:**
+- ถ้า upstream เพิ่ม glob `gpt-6*` เข้า `PATTERN_PRICING` → **LP-008 จะถูกบายพาส** เพราะ pattern แมตช์ที่ step 4 ก่อน step 5 ต้องตรวจว่า `gpt-6-astra-high` ยังได้เรต astra (10/50) ไม่ใช่เรตรวม
+- ถ้า upstream แก้ `getPricingForModel` ให้ strip suffix เอง → LP-008 = `UPSTREAM_FIXED` (แต่ต้องดูว่า upstream วางไว้ก่อนหรือหลัง pattern — ถ้าวางก่อน `*-codex-high` จะ regress)
+- LP-007/LP-009 เป็น **ตัวเลขที่ upstream เป็นคนใส่** → conflict ทุกครั้งที่ upstream แตะ pricing **ห้ามเชื่อ changelog** ให้ diff กับหน้า pricing ทางการจริงทุกรอบ
+- รัน `npx vitest run unit/pricing-effort-suffix.test.js` เป็น gate — เทสมีทั้งฝั่ง "ต้องแก้" และ "ห้าม regress"
+
+---
+
+## LP-010: ไม่มี pricing entry แล้วเงียบ
+
+**Status:** ACTIVE · **Commit:** `d09abdcb` · **Implemented:** 2026-09-28
+
+**Root cause:** `calculateCost()` ใช้ `if (!pricing) return 0;` เฉยๆ → model ที่ไม่มีเรต หน้าตาเหมือน model ฟรีเป๊ะ นี่คือเหตุผลที่ LP-007 ซ่อนอยู่ได้หลายสัปดาห์โดยไม่มีอะไรเตือน
+
+**Change:** warn หนึ่งครั้งต่อ `provider|model` ต่อ process (dedupe ด้วย `Set`) log แค่ชื่อ provider/model ไม่มี apiKey หรือ token
+
+**Files:** `src/lib/db/repos/usageRepo.js`
+
+**เช็คตอน upgrade:** เป็นบล็อกเล็กใน `calculateCost` ถ้า upstream เขียนฟังก์ชันนี้ใหม่ให้ re-apply — แต่ถ้า upstream มี logging ของตัวเองแล้วให้ถือเป็น `UPSTREAM_FIXED`
+
+---
+
+## LP-011: เทสเขียนทับ DB จริงของ gateway ⚠️
+
+**Status:** ACTIVE · **Commit:** `594fcba0` · **Implemented:** 2026-09-28
+
+**อาการที่ผู้ใช้เจอ:** provider **Zed** โผล่ในแดชบอร์ดพร้อม "1 Connected" ทั้งที่ลบไปแล้ว — และเคยเกิดมาก่อนหน้านี้ด้วย
+
+**Root cause:** `src/lib/dataDir.js` fallback ไป `~/.9router` เมื่อไม่ได้ตั้ง `DATA_DIR` → เทสไฟล์ไหนที่แตะ db layer โดยไม่ isolate ตัวเอง **จะเขียนลง DB ของ gateway ที่รันอยู่จริง** แค่รัน `npx vitest run` ตามที่ CLAUDE.md เขียนไว้ ก็ได้
+- `tests/unit/zed-native-auth.test.js` → connection `zed` ปลอม 2 แถว (`accessToken: "decrypted-token-xy…"`)
+- `tests/unit/provider-priority-insert-cost.test.js` → `openai-compatible-*` fixture ~143 แถว
+
+`zed-native-auth.test.js:2` **เขียน comment ไว้แล้ว** ว่า `RUN WITH AN ISOLATED DB: DATA_DIR=$(mktemp -d) …` แต่ไม่มีอะไรบังคับ
+
+**Change:** ตั้ง `test.env.DATA_DIR` เป็น `mkdtempSync()` ต่อหนึ่งรอบรันใน `tests/vitest.config.js` → ไม่ต้องพึ่งวินัยรายไฟล์อีก ไฟล์ที่ตั้ง `DATA_DIR` เองยัง override ได้ตามเดิม
+
+**ล้างข้อมูลที่ปนเปื้อนแล้ว (2026-09-28):** ลบ 145 แถวจาก `providerConnections` (`createdAt >= 2026-09-28T10:40:21` และ provider เป็น `zed` หรือ `openai-compatible-%`) เหลือ connection จริง 9 แถว
+สำรองก่อนลบไว้ที่ `~/.9router/db/backups/data.sqlite.pre-fixture-cleanup-20260928-174351`
+ตรวจแล้วว่าตารางอื่นไม่โดน — `usageHistory`, `providerNodes`, `apiKeys`, `combos`, `proxyPools` สะอาด
+
+**Files:** `tests/vitest.config.js`
+
+**⚠️ เช็คตอน upgrade — สำคัญที่สุดในไฟล์นี้:** ถ้า upstream เขียน `tests/vitest.config.js` ทับแล้ว `env.DATA_DIR` หาย **การรันเทสครั้งถัดไปจะเขียน DB จริงอีก** วิธีตรวจเร็ว:
+
+```bash
+sqlite3 ~/.9router/db/data.sqlite "SELECT COUNT(*) FROM providerConnections;"   # ก่อนรันเทส
+cd tests && npx vitest run unit/zed-native-auth.test.js unit/provider-priority-insert-cost.test.js
+sqlite3 ~/.9router/db/data.sqlite "SELECT COUNT(*) FROM providerConnections;"   # ต้องเท่าเดิม
+```
+
+---
+
+## LP-012: สคริปต์ backfill ยอด cost ย้อนหลัง
+
+**Status:** ACTIVE · **Commit:** `cc176d22` · **Implemented:** 2026-09-28
+
+**เหตุผล:** cost ถูกคำนวณ **ตอนเขียน** (`usageRepo.saveRequestUsage`) แล้วเก็บลงคอลัมน์ `usageHistory.cost` พร้อม pre-aggregate ลง `usageDaily.data` ฝั่งอ่านแค่ `SUM()` ไม่คำนวณใหม่ → LP-007/008/009 มีผลกับ request ใหม่เท่านั้น ยอดเก่าต้อง backfill แยก
+
+**Change:** `scripts/backfill-usage-cost.mjs` — dry-run เป็น default, `--apply` ถึงเขียนจริง คำนวณ delta ต่อแถวแล้วบวกกลับเข้า **ครบทั้ง 6 ช่อง cost** ของ `usageDaily` (`cost`, `byProvider`, `byModel`, `byAccount`, `byApiKey`, `byEndpoint`) ใน transaction เดียวแบบ `BEGIN IMMEDIATE` (กัน server ที่รันอยู่แทรก write ระหว่าง read→write ของ day blob แล้วโดนทับหาย)
+
+import resolver + สูตรคิดเงินจาก `open-sse/providers/pricing.js` **ห้ามเขียนสูตรซ้ำ** และต่อ SQLite ตรงๆ เพราะสาย `src/lib/db/driver.js` ใช้ alias `@/` ที่ node เปล่ารันไม่ได้
+
+`getLocalDateKey` ย้ายออกมาเป็น `src/lib/db/helpers/dateKey.js` เพื่อให้ write path กับสคริปต์แบ่งวันเหมือนกันเป๊ะ (เป็น **local time ไม่ใช่ UTC** — ถ้า copy แล้ว drift จะทำให้วันเดียวแตกเป็นสอง key)
+
+**Files:** `scripts/backfill-usage-cost.mjs`, `src/lib/db/helpers/dateKey.js`, `src/lib/db/repos/usageRepo.js`
+
+**วิธีใช้:** ต้องหยุด server ก่อน (in-memory ring จะค้างของเก่า) และสำรอง DB
+```bash
+node scripts/backfill-usage-cost.mjs                      # dry-run
+node scripts/backfill-usage-cost.mjs --apply
+node scripts/backfill-usage-cost.mjs --provider kimi --model 'k3%' --zero-only
+```
+
+**เช็คตอน upgrade:** ถ้า `aggregateEntryToDay` ของ upstream เพิ่ม/เปลี่ยน bucket ต้องแก้ `bucketKeys()` ในสคริปต์ให้ตรงกัน ไม่งั้น backfill จะทำให้ยอดรวมกับยอดย่อยไม่ตรง
 
 ---
 

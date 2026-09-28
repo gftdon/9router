@@ -374,6 +374,17 @@ export const PATTERN_PRICING = [
 ];
 
 /**
+ * Trailing reasoning-effort / thinking levels that the router keeps in the
+ * client-facing model id. Dash levels come from a registry entry's
+ * `thinkingLevels` (e.g. providers/registry/codex.js) and the codex executor's
+ * own `effortLevels`; the "(level)" form is the convention every other provider
+ * uses. Effort changes how many tokens a request burns, not the per-token rate,
+ * so a suffixed id bills at its base model's price.
+ */
+const EFFORT_SUFFIX = /-(none|minimal|low|medium|high|xhigh|max|ultra)$/i;
+const LEVEL_PARENS = /\([^()]+\)\s*$/;
+
+/**
  * Match a model ID against a glob pattern (* = wildcard). Case-insensitive:
  * registry ids mix casing (e.g. "MiniMax-M2.5" vs "minimax-m2.5").
  */
@@ -383,11 +394,12 @@ export function matchPattern(pattern, model) {
 }
 
 /**
- * Resolve pricing for a model using the 4-step fallback chain:
+ * Resolve pricing for a model using the 5-step fallback chain:
  *   1. PROVIDER_PRICING[provider][model]
  *   2. free namespace (upstream bills $0)
  *   3. MODEL_PRICING[model]
  *   4. PATTERN_PRICING (glob match)
+ *   5. retry without a trailing effort/thinking level
  *
  * @param {string} provider
  * @param {string} model
@@ -415,6 +427,14 @@ export function getPricingForModel(provider, model) {
       return pricing;
     }
   }
+
+  // 5. Last resort: the id still carries a thinking level the executor only
+  // strips for the upstream body ("gpt-6-astra-medium", "k3(max)"), so retry on
+  // the base model. Running after the patterns keeps effort-specific tiers such
+  // as "*-codex-high" authoritative — this only fires where we'd return null,
+  // i.e. where the caller would otherwise record $0.
+  const stripped = baseModel.replace(LEVEL_PARENS, "").replace(EFFORT_SUFFIX, "");
+  if (stripped && stripped !== baseModel) return getPricingForModel(provider, stripped);
 
   return null;
 }

@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { getAdapter } from "../driver.js";
 import { parseJson, stringifyJson } from "../helpers/jsonCol.js";
 import { getMeta, setMeta } from "../helpers/metaStore.js";
+import { getLocalDateKey } from "../helpers/dateKey.js";
 
 function maskApiKey(key) {
   if (!key || typeof key !== "string") return null;
@@ -44,11 +45,6 @@ function scheduleStatsEvent(event, delayMs = 150) {
     statsEmitter.emit(event);
   }, delayMs);
   statsEmitTimers[key]?.unref?.();
-}
-
-function getLocalDateKey(timestamp) {
-  const d = timestamp ? new Date(timestamp) : new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function addToCounter(target, key, values) {

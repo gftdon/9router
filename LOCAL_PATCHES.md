@@ -7,15 +7,86 @@
 
 | Commit | ไฟล์ที่แก้ | แก้อะไร | สถานะ |
 |---|---|---|---|
-| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / MODIFIED |
-| `0bb6cc65` | `src/sse/services/model.js` | Patch 2: strip `[1m]` suffix ตอน resolve combo name | ACTIVE / KEPT |
-| `c31f4070` | `open-sse/translator/formats/gemini.js` | LP-006: strip schema annotations โดยรักษาชื่อ property จริง (เพิ่มทะเบียนย้อนหลัง) | ACTIVE / KEPT |
-| `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE |
-| `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE |
+| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / KEPT (v0.5.91) |
+| `0bb6cc65` | `src/sse/services/model.js` | Patch 2: strip `[1m]` suffix ตอน resolve combo name | ACTIVE / REDUNDANT-สำหรับ chat path (v0.5.91) |
+| `c31f4070` | `open-sse/translator/formats/gemini.js` | LP-006: strip schema annotations โดยรักษาชื่อ property จริง (เพิ่มทะเบียนย้อนหลัง) | ACTIVE / KEPT (v0.5.91) |
+| `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.91) |
+| `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.91, rebased) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
 | — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
+
+## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.91 — 2026-09-28
+
+Upstream: tag `v0.5.91`, commit `f01fb909e37189008080632ddaf404f096345cde` (38 commits, 123 files เทียบกับ `v0.5.86`)
+Merge commit ของ fork: `302e119d`; ตรวจ implementation จริงของ upstream ทุกตัว ไม่ได้ตัดสินจาก changelog
+
+ก่อนอัปเดตต้องเพิ่ม remote `upstream` กลับ — git config ของ checkout นี้เหลือแค่ `origin` (`gftdon/9router`)
+และ ref `upstream/master` ที่ค้างอยู่ชี้ v0.5.45 ซึ่งเก่ากว่าความจริงมาก:
+
+```bash
+git remote add upstream https://github.com/decolua/9router.git
+git fetch upstream --tags
+```
+
+### ไฟล์ที่ upstream แตะทับแพตช์
+
+| ไฟล์ | upstream commit ใน v0.5.86..v0.5.91 | ผลต่อแพตช์ |
+|---|---|---|
+| `open-sse/executors/default.js` | `dc198dff` (merge client anthropic-beta + rate-limit headers), `6aea3875` (forward `x-claude-code-session-id`) | **conflict** — resolve แบบ semantic |
+| `open-sse/providers/capabilities.js` | `fdcba3e1` (เลิก cache catalog source), `37a6b7e0` (`resolveCaps` ใน `aggregateComboCapabilities`) | auto-merge คนละบล็อกกับ Patch 1 |
+| `open-sse/translator/formats/gemini.js` | `30464bc2` (guard terminal model turn ใน `normalizeGeminiContents`) | auto-merge คนละบล็อกกับ LP-006 |
+| `open-sse/providers/shared.js` | `dc198dff` (เพิ่ม `mergeAnthropicBeta`) | ไม่กระทบ (LP-005 UPSTREAM_FIXED อยู่แล้ว) |
+| `src/sse/services/model.js`, `open-sse/translator/formats/claude.js` | — (upstream ไม่แตะ) | Patch 2 / LP-003 รอดโดยไม่ต้อง rebase |
+
+### ผลประเมินรายแพตช์
+
+| Patch | ผล | หลักฐานที่ตรวจจริงใน v0.5.91 |
+|---|---|---|
+| Patch 1 — GLM-5.2 suffix lookup | KEPT | `getCapabilitiesForModel` ของ upstream ยังไม่ strip suffix เลย (grep `replace(/\(` ใน `capabilities.js` = 0 hit) — `glm-5.2(high)` ยังตกไป pattern tier ถ้าไม่มีแพตช์ ยืนยัน runtime: ctx = 1000000 ทั้ง `glm-5.2` และ `glm-5.2(high)` |
+| Patch 2 — Combo `[1m]` | **REDUNDANT สำหรับ chat path** (เก็บไว้) | แก้คำตัดสินของรอบ v0.5.86: upstream **มี** `stripModelContextMarker` ที่ `src/sse/handlers/chat.js:55` และ strip `[1m]` ใส่ `body.model` **ก่อน** เรียก `getComboModels` ที่บรรทัด 97/172 — และมีมาแล้วตั้งแต่ v0.5.86 (`open-sse/utils/modelMarkers.js` ไม่เปลี่ยนเลยระหว่าง v0.5.86→v0.5.91) รอบก่อนตรวจแค่ `src/sse/services/model.js` จึงสรุปว่า KEPT ผิด ส่วนที่แพตช์ยังคุ้มอยู่คือ `getComboModels` อีก 2 call site ที่ไม่ strip: `src/sse/handlers/tts.js:48` และ `src/sse/handlers/imageGeneration.js:50` (ในทางปฏิบัติ client ไม่ส่ง `[1m]` มาทาง TTS/image) ยังไม่ลบเพราะการลบเป็นการเปลี่ยน behavior ที่ไม่จำเป็นต่อการอัปเกรด — **ผู้สมัครถอดออกใน commit แยก** |
+| LP-003 — native thinking | KEPT | `normalizeClaudePassthrough` ของ upstream ยังใช้ `isValidClaudeSignature(block.signature)` ทิ้ง block และยัง `unshift(buildThinkingPlaceholder("claude"))` (v0.5.91 `claude.js:272,287`) ทั้งไฟล์ไม่ถูกแตะระหว่าง v0.5.86→v0.5.91 |
+| LP-004 — native client version | KEPT (rebased) | v0.5.91 `default.js` ไม่มีการอ่าน `rawHeaders["user-agent"]` เลย (grep เจอเฉพาะ `anthropic-beta` และ UA คงที่ของ kiro) ยังทับ UA ด้วย `CLAUDE_CLI_VERSION` คงที่เหมือนเดิม `84035760` แก้แค่ test fixture/baseline ไม่ใช่ตัว logic |
+| LP-005 — dashboard version | UPSTREAM_FIXED (คงเดิม) | `open-sse/providers/shared.js:25` = `CLAUDE_CLI_VERSION = "2.1.280"` ยังตรงตาม fix `cbffeb97` ไม่มี implementation ของ LP-005 เหลือใน fork เก็บเฉพาะ regression coverage |
+| LP-006 — Gemini schema | KEPT | v0.5.91 `gemini.js` ไม่มีคำว่า `errorMessage` เลย (0 hit) และ `removeUnsupportedKeywords` ยังไม่มีพารามิเตอร์ `isPropertyMap` → ยังลบ property ที่ชื่อตรงกับ keyword ยืนยัน runtime: property ชื่อ `errorMessage` รอด และ annotation `errorMessage` ถูก strip |
+| Bug A — empty-schema `reason` | NEEDS_REVIEW (ไม่เปลี่ยน) | `cleanJSONSchemaForAntigravity({type:"object",properties:{}})` ยังคืน `properties.reason` + `required:["reason"]` (v0.5.91 `gemini.js:401,406,413,418`) ยังเป็นประเด็นค้าง ไม่ได้เกิดจากรอบนี้ ยืนยันระดับ schema transformation เท่านั้น ไม่ได้ยิง live Gemini tool-call |
+
+### Conflict ที่ resolve และเหตุผล
+
+**`open-sse/executors/default.js`** — upstream เขียนบล็อก Anthropic-Beta ทับตำแหน่งที่ LP-004 hoist ตัวแปร `isClaudeUpstream` ออกมา
+resolve โดยเก็บ **ทั้งสองฝั่ง**: ใช้ logic ใหม่ของ upstream ครบ (`mergeAnthropicBeta(selectAnthropicBeta(model, body), clientBeta)`,
+สาขา `provider === "anthropic"`, และการเติม `x-claude-code-session-id` จาก `metadata.user_id` สำหรับ token `sk-ant-oat`)
+แต่ให้เงื่อนไขอ่านจาก `isClaudeUpstream` ที่ LP-004 ต้องใช้ต่อ — `model && isClaudeUpstream` เทียบเท่าเงื่อนไขเดิมของ upstream แบบตรงตัว
+ไม่ได้เลือก ours/theirs แบบ blind และ `git diff v0.5.91` เหลือเฉพาะ 2 hunk ของ LP-004 เท่านั้น
+
+**`tests/unit/claude-cloaking.test.js`** — ทั้งสองฝั่ง assert `cc_version=2.1.280` เหมือนกัน ต่างแค่ escape จุดใน regex
+เก็บฝั่ง fork ที่ escape ถูก (`2\.1\.280`) เพราะเข้มกว่าและความหมายเท่ากัน
+
+### Validation (2026-09-28)
+
+- **Full suite:** ก่อน merge 2,616 passed / 93 failed (71 ไฟล์แดง), หลัง merge **2,764 passed / 97 failed** (73 ไฟล์แดง) จาก 2,920 tests
+  upstream เพิ่มเทสใหม่ 152 รายการ เทียบผลราย assertion (ไม่ใช่ raw count) แล้ว **ไม่มี regression จากแพตช์หรือ merge**
+- **เทสที่เปลี่ยนจากเขียวเป็นแดง 4 รายการ = ข้อบกพร่องของ upstream ไม่ใช่ของ merge** — `unit/image-generation.test.js`
+  (`gpt-5.5-image`, `gpt-5.6-sol-image`, `gpt-5.6-terra-image`, `gpt-5.6-luna-image`) พิสูจน์โดยรัน worktree ของ **tag `v0.5.91` เปล่า**
+  ได้ผลแดง 4 รายการเดียวกันเป๊ะ (4 failed / 17 passed) สาเหตุ: `95600db1` ขยับ `CODEX_CLI_VERSION` เป็น `0.155.0`
+  ใน `open-sse/providers/registry/codex.js:5` และอัปเดต `unit/codex-gpt6-lite.test.js` แล้ว แต่ลืม `unit/image-generation.test.js:354`
+  ที่ยัง assert `version: "0.154.0"` → เป็น fixture ค้าง ไม่ใช่บั๊กของ product
+- **Patch regression tests:** `local-patch-routing`, `claude-native-thinking`, `claude-client-version`,
+  `gemini-schema-clean-errormessage`, `claude-cloaking` → **5 ไฟล์ 44 tests ผ่านทั้งหมด**
+- **Baselines:** aliases (117 tokens) ✅ byte-for-byte, OAuth URLs ✅ byte-for-byte,
+  providers ❌ 1 field diff = `codex.headers` `0.154.0` → `0.155.0` + เพิ่ม `version` header
+  ซึ่งเป็น**ผลที่ upstream ตั้งใจใน `95600db1`** แต่ upstream ไม่ได้ refresh `tests/__baseline__/providers-baseline.json`
+  (รากเดียวกับเทส 4 รายการข้างบน) **ยังไม่ refresh snapshot ในรอบนี้** เพราะเป็นการแก้นอกขอบเขต upgrade — ค้างไว้เป็น commit แยก
+- **ESLint:** ไฟล์แพตช์และไฟล์ที่ resolve conflict ผ่านทั้งหมด
+- **Build:** `npm run build` ผ่านที่เวอร์ชัน 0.5.91 รวมขั้น `postbuild` copy standalone assets
+- **Versions:** root manifest และ CLI manifest = **0.5.91** ตรงกับ upstream ทั้งคู่ (merge พามาเอง ไม่ต้อง bump มือ)
+- **`git diff --check`** เตือน blank line at EOF 2 จุด (`.github/workflows/tray-binaries.yml:176`,
+  `src/app/(dashboard)/dashboard/cli-tools/components/codexConfig.js:86`) ทั้งคู่เป็นไฟล์ของ upstream ที่ไม่มี local delta
+  (`git diff v0.5.91` ว่าง) และเตือนเหมือนกันบน tag เปล่า
+- **ยังไม่ได้ทำในรอบนี้:** ไม่ได้ `npm run cli:pack`, ไม่ได้ติดตั้ง global, ไม่ได้รีสตาร์ต LaunchAgent และไม่ได้ยิง live probe
+  (`/api/health`, Add Model test, native Claude Code / Combo probe) — การยืนยันระดับ deployment ของ v0.5.91 จึง **ยังไม่มี**
+  ต่างจากรอบ v0.5.86 ที่บันทึกผลติดตั้งจริงไว้
 
 ## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.86 — 2026-09-24
 
@@ -85,6 +156,8 @@ curl --fail http://127.0.0.1:20128/api/health
 **Commit:** `b55f405e` · **ไฟล์ที่แก้:** `open-sse/providers/capabilities.js` · **วันที่:** 2026-07-30
 
 **v0.5.86:** ACTIVE / MODIFIED — เก็บเฉพาะ suffix lookup; provider override ด้านล่างเป็นประวัติและไม่ต้อง re-apply เพราะ upstream มี canonical GLM-5.2 1M / 131072 แล้ว ทดสอบด้วย `tests/unit/local-patch-routing.test.js`
+
+**v0.5.91:** ACTIVE / KEPT — upstream ยังไม่ strip suffix; ยืนยัน runtime `glm-5.2(high)` → ctx 1000000
 
 ### อาการ (Bug B)
 
@@ -175,6 +248,12 @@ grep -o '"glm-5.2":{reasoning:!0,thinkingFormat:"zai",contextWindow:1e6' \
 
 **Commit:** `0bb6cc65` · **ไฟล์ที่แก้:** `src/sse/services/model.js` · **วันที่:** 2026-07-30
 
+**v0.5.91:** ACTIVE แต่ **ซ้ำกับ upstream ใน chat path** — `src/sse/handlers/chat.js:55` เรียก `stripModelContextMarker`
+ตัด `[1m]` ใส่ `body.model` ก่อนถึง `getComboModels` (บรรทัด 97/172) มาตั้งแต่ v0.5.86 ดังนั้นอาการเดิม
+(`9-fast-worker[1m]` → `model_not_found`) upstream ครอบคลุมแล้ว ที่แพตช์ยังกันอยู่คือ `getComboModels` อีก 2 call site
+ที่ไม่ strip เอง: `src/sse/handlers/tts.js:48`, `src/sse/handlers/imageGeneration.js:50`
+เก็บไว้ก่อนเพราะถอดออกเป็นการเปลี่ยน behavior ที่ไม่จำเป็นต่อ upgrade — ควรตัดสินใจถอดใน commit แยก
+
 ### อาการ
 
 Sub-agent (ใช้ combo `9-fast-worker`) thrash ที่ ~117K ทั้งที่แก้ GLM caps แล้ว (Patch 1) และ route ไป GLM-5.2 (1M)
@@ -243,6 +322,8 @@ grep -q 's\*1m' ~/.local/lib/node_modules/9router/app/.next-cli-build/server/chu
 
 **Status:** ACTIVE · **Commit:** `b35cdcac` · **Date:** 2026-09-21
 
+**v0.5.91 audit:** KEPT — `claude.js` ไม่ถูกแตะระหว่าง v0.5.86→v0.5.91 และ upstream ยังทิ้ง block ตาม `isValidClaudeSignature` แล้ว `unshift` placeholder (`claude.js:272,287`)
+
 **Scope:** Claude Code native passthrough, including a single-model Combo routed to Claude.
 
 **Root cause:** `normalizeClaudePassthrough` used an E/R-only signature heuristic. Real Opus 5 responses in the affected sessions carried `CAIS...` signatures, which the router discarded. With manual thinking enabled it inserted a hardcoded signed placeholder; with adaptive thinking it dropped the blocks. `redacted_thinking` blocks were also discarded because their opaque payload is in `data`, not `signature`.
@@ -279,6 +360,8 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 
 **Status:** ACTIVE · **Commit:** `ac47e8b7` · **Date:** 2026-09-23
 
+**v0.5.91 audit:** KEPT (rebased ผ่าน conflict) — v0.5.91 `default.js` ไม่อ่าน `rawHeaders["user-agent"]` เลย ยังทับ UA ด้วย `CLAUDE_CLI_VERSION` คงที่ แพตช์ถูก rebase ให้ใช้ `isClaudeUpstream` ร่วมกับ logic `mergeAnthropicBeta` + session-id ใหม่ของ upstream
+
 **Scope:** Incoming Claude Code requests routed to the `claude` provider or a Claude model on an `anthropic-compatible-*` provider.
 
 **Symptom:** Upstream reports `claude_code_version_too_old`, naming 2.1.258 and requiring 2.1.280, even though the installed Claude Code is already 2.1.280. Restarting the router does not update the compiled header default.
@@ -312,6 +395,8 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 
 **Status:** UPSTREAM_FIXED · **Original commit:** `83bda598` · **Date:** 2026-09-23 · **Fixed upstream:** `cbffeb97` (included in v0.5.86)
 
+**v0.5.91 audit:** UPSTREAM_FIXED ยังเป็นจริง — `shared.js:25` = `CLAUDE_CLI_VERSION = "2.1.280"`
+
 **Scope:** Dashboard Add Model/Test and other translated requests without an incoming Claude Code identity. Complements LP-004, which only forwards an existing native client User-Agent.
 
 **Root cause:** `AddCustomModelModal` calls `/api/models/test`; `pingModelByKind` then sends an OpenAI-format request to internal chat completions without a Claude Code User-Agent. Both the provider's default User-Agent and the generated billing attribution therefore used the static `CLAUDE_CLI_VERSION = "2.1.258"`. Opus 5.5 rejects this version and requires 2.1.280. Restarting does not update a compiled constant. The default comes from upstream snapshot `23ae82d8`, not a local patch. LP-004's earlier Opus 5 CLI probe did not cover this dashboard path or Opus 5.5.
@@ -344,6 +429,8 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 
 **Status:** ACTIVE · **Commit:** `c31f4070` · **Implemented:** 2026-09-20 · **Registered:** 2026-09-24
 
+**v0.5.91 audit:** KEPT — v0.5.91 `gemini.js` ไม่มี `errorMessage` (0 hit) และ `removeUnsupportedKeywords` ยังไม่มี `isPropertyMap`
+
 **Root cause:** Gemini/Antigravity reject schema annotations such as `errorMessage` and `errorMessages`. The old recursive cleaner also treated keys under `properties` as schema keywords, deleting legitimate parameters named `errorMessage`, `title`, or `format`.
 
 **Change:** Strip unsupported annotations recursively while preserving actual property names. Applies to the shared Gemini schema cleaner; provider credentials and prompts are unchanged.
@@ -359,6 +446,8 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 ### Bug A: `reason` injection ใน tool schema ว่าง (gemini/antigravity path)
 
 **สถานะ:** NEEDS_REVIEW — ประเด็นเดิมที่ยังไม่ได้แก้ · **ไฟล์:** `open-sse/translator/formats/gemini.js`, `cleanJSONSchemaForAntigravity()`
+
+**ตรวจซ้ำ v0.5.91 (2026-09-28):** ยังเหมือนเดิมทุกอย่าง — `cleanJSONSchemaForAntigravity({type:"object",properties:{}})` คืน `properties.reason` + `required:["reason"]` (`gemini.js:401,406,413,418`) upstream ไม่แก้ในรอบนี้
 
 **ตรวจซ้ำ v0.5.86 (2026-09-24):** การเรียก cleaner ด้วย `{type: "object", properties: {}}` ยังได้ `properties.reason` และ `required: ["reason"]`; ยืนยันได้ในระดับ schema transformation รอบนี้ ไม่ได้รัน live Gemini tool-call เพื่อยืนยัน error ฝั่ง Claude Code ซ้ำ ควรแยกแก้และทดสอบ empty-tool round-trip ก่อนปิดประเด็น
 

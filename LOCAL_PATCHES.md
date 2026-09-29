@@ -20,6 +20,7 @@
 | `d09abdcb` | `src/lib/db/repos/usageRepo.js` | LP-010: warn เมื่อไม่มี pricing entry (เลิกเงียบ) | ACTIVE |
 | `594fcba0` | `tests/vitest.config.js` | LP-011: บังคับ DATA_DIR แยกตอนรันเทส (กัน DB จริงโดนเขียน) | ACTIVE |
 | `cc176d22` | `scripts/backfill-usage-cost.mjs`, `src/lib/db/helpers/dateKey.js` | LP-012: สคริปต์ backfill ยอด cost ย้อนหลัง | ACTIVE |
+| `ba910b94` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/opencode{,-go,-zen}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
@@ -541,6 +542,25 @@ node scripts/backfill-usage-cost.mjs --provider kimi --model 'k3%' --zero-only
 ```
 
 **เช็คตอน upgrade:** ถ้า `aggregateEntryToDay` ของ upstream เพิ่ม/เปลี่ยน bucket ต้องแก้ `bucketKeys()` ในสคริปต์ให้ตรงกัน ไม่งั้น backfill จะทำให้ยอดรวมกับยอดย่อยไม่ตรง
+
+---
+
+## LP-013: Muse Spark ปฏิเสธ tool schema ที่ซ้อนลึกเกิน 10 ชั้น
+
+**Status:** ACTIVE · **Commit:** `ba910b94` · **Implemented:** 2026-09-29
+
+**อาการ:** sub-agent `fast-worker` (combo `9-fast-worker` → `ocg/muse-spark-1.3-contributor(max)`) ล้มทันทีด้วย `400 JSON schema exceeds the maximum nesting depth of 10 levels` (`param: parameters`) เมื่อ client ส่ง MCP tool ที่ schema ลึก (เช่น Vercel `update_firewall_config`, `create_sandboxes_*`) — request ทั้งก้อนพังทุก account
+
+**Root cause:** backend ของ Muse Spark จำกัดความลึกของ tool `parameters` ไว้ 10 ชั้น ส่วน 9router ส่ง schema ไปตามเดิมโดยไม่ตรวจ วัดจริง (2026-09-29) ได้กฎการนับดังนี้: 1 ชั้น = node ที่มี `properties`/`items` (นับ root ด้วย), `anyOf`/`oneOf`/`allOf` และ `additionalProperties` ไม่นับ, `$ref` ภายในถูก resolve ก่อนนับ, leaf `{type:"object"}` ที่ไม่มี `properties` ผ่าน
+
+**Change:** `open-sse/utils/museSparkToolSchema.js` (`capToolSchemasDepth`) — ถ้า schema ลึกเกิน จะ inline `$ref` ภายใน, ตัด `$defs`/`definitions` และยุบ node ที่เกินชั้นที่ 10 ให้เหลือ leaf ที่ยังเก็บ `type`/`description` (ต่อท้ายด้วย "nested fields omitted") ส่วน `$ref` ที่วนกลับหาตัวเองจะถูกยุบที่รอบที่สอง ถ้า schema ไม่เกิน limit จะคืน reference เดิมโดยไม่แตะเลย
+เรียกเฉพาะเมื่อ `isMuseSparkModel(model)` ใน executor ทั้ง 3 ตัวที่เสิร์ฟ Muse (`opencode-go`, `opencode-zen`, `opencode` free) **model อื่นไม่ถูกแตะ**
+
+**Files:** `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/opencode-go.js`, `open-sse/executors/opencode-zen.js`, `open-sse/executors/opencode.js`, `tests/unit/muse-spark-tool-schema-depth.test.js`
+
+**Validation:** unit 8/8 ผ่าน, full suite ไม่มีเทสใหม่ที่ fail (เทียบกับรันแบบ stash: fail 97 เท่าเดิม — `verify-no-regression.mjs` baseline ใช้ไม่ได้ ชื่อเทสออกมาเป็น `undefined`); live กับ upstream: schema ดิบ (object 14 ชั้น, array+anyOf 13 ชั้น, `$defs` 14 ชั้น, `$ref` วนตัวเอง) ได้ 400 ทั้งหมด → หลัง cap ได้ 200 ทั้งหมด
+
+**เช็คตอน upgrade:** ถ้า upstream เพิ่ม depth/schema sanitizer ของ Muse Spark เอง หรือ Muse ขยาย limit ให้ประเมินว่า patch นี้ยังจำเป็นไหม; ถ้า upstream แยก `normalizeResponsesTools` ออกเป็น helper ร่วม ต้องย้ายการเรียก `capToolSchemasDepth` ตามไปด้วย
 
 ---
 

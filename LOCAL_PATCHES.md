@@ -560,6 +560,8 @@ node scripts/backfill-usage-cost.mjs --provider kimi --model 'k3%' --zero-only
 
 **Validation:** unit 8/8 ผ่าน, full suite ไม่มีเทสใหม่ที่ fail (เทียบกับรันแบบ stash: fail 97 เท่าเดิม — `verify-no-regression.mjs` baseline ใช้ไม่ได้ ชื่อเทสออกมาเป็น `undefined`); live กับ upstream: schema ดิบ (object 14 ชั้น, array+anyOf 13 ชั้น, `$defs` 14 ชั้น, `$ref` วนตัวเอง) ได้ 400 ทั้งหมด → หลัง cap ได้ 200 ทั้งหมด
 
+**Install (2026-09-29):** `npm run cli:pack` → `npm install --global ./9router-0.5.91.tgz` (สำรองตัวเก่าที่ `/tmp/9router-global-backup-0.5.91-20260929-155525.tgz`) แล้วเปิดใหม่ผ่าน `launchctl kickstart gui/$(id -u)/com.9router.autostart` → `/api/health` = `{"ok":true}`; schema ดิบ 4 แบบข้างบนผ่าน gateway ได้ 200 ทั้งหมด และ sub-agent `fast-worker` กลับมารันได้ (ก่อนแก้ 400 ทันที)
+
 **เช็คตอน upgrade:** ถ้า upstream เพิ่ม depth/schema sanitizer ของ Muse Spark เอง หรือ Muse ขยาย limit ให้ประเมินว่า patch นี้ยังจำเป็นไหม; ถ้า upstream แยก `normalizeResponsesTools` ออกเป็น helper ร่วม ต้องย้ายการเรียก `capToolSchemasDepth` ตามไปด้วย
 
 ---

@@ -3,6 +3,8 @@ import { DefaultExecutor } from "./default.js";
 import { resolveSessionId } from "../utils/sessionManager.js";
 import { getModelTargetFormat } from "../config/providerModels.js";
 import { FORMATS } from "../translator/formats.js";
+import { isMuseSparkModel } from "../providers/models/helpers.js";
+import { capToolSchemasDepth } from "../utils/museSparkToolSchema.js";
 import {
   normalizeResponsesInput,
   clampResponsesCallId,
@@ -180,6 +182,8 @@ export class OpenCodeGoExecutor extends DefaultExecutor {
     out.stream = true;
     out.store = false;
     normalizeResponsesTools(out);
+    // Muse Spark 400s any tool schema nested past 10 levels; other models untouched.
+    if (isMuseSparkModel(model || body?.model)) capToolSchemasDepth(out.tools);
     sanitizeResponsesItems(out);
     return out;
   }

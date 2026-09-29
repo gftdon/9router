@@ -6,6 +6,7 @@ import { getThinkingLevels } from "../providers/thinkingLevels.js";
 import { injectReasoningContent } from "../utils/reasoningContentInjector.js";
 import { resolveSessionId } from "../utils/sessionManager.js";
 import { isMuseSparkModel } from "../providers/models/helpers.js";
+import { capToolSchemasDepth } from "../utils/museSparkToolSchema.js";
 import { applyFingerprintTools } from "../utils/opencodeFingerprint.js";
 import { ANTHROPIC_API_VERSION } from "../providers/shared.js";
 import {
@@ -437,6 +438,8 @@ export class OpenCodeExecutor extends BaseExecutor {
       body.stream = true;
       body.store = false;
       normalizeResponsesTools(body);
+      // Muse Spark 400s any tool schema nested past 10 levels; other models untouched.
+      if (isMuseSparkModel(model || body?.model)) capToolSchemasDepth(body.tools);
       sanitizeResponsesItems(body);
       // Free-tier fingerprint tools are required even when an agent client
       // already supplied tools. ZCode/Claude Code requests normally have

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { DefaultExecutor } from "./default.js";
 import { resolveSessionId } from "../utils/sessionManager.js";
 import { isMuseSparkModel } from "../providers/models/helpers.js";
+import { capToolSchemasDepth } from "../utils/museSparkToolSchema.js";
 import {
   normalizeResponsesInput,
   clampResponsesCallId,
@@ -309,6 +310,8 @@ export class OpenCodeZenExecutor extends DefaultExecutor {
     out.store = false;
     ensureResponsesFingerprintTools(out);
     normalizeResponsesTools(out);
+    // Muse Spark 400s any tool schema nested past 10 levels; other models untouched.
+    if (isMuseSparkModel(model || body?.model)) capToolSchemasDepth(out.tools);
     sanitizeResponsesItems(out);
     return out;
   }

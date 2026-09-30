@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CodexExecutor } from "../../open-sse/executors/codex.js";
+import codexProvider from "../../open-sse/providers/registry/codex.js";
 import { getModelsByProviderId } from "../../open-sse/config/providerModels.js";
 import { getCapabilitiesForModel } from "../../open-sse/providers/capabilities.js";
 import { getThinkingLevels } from "../../open-sse/providers/thinkingLevels.js";
@@ -10,7 +11,7 @@ const credentials = { connectionId: "fixture", accessToken: "fixture-token" };
 afterEach(() => vi.restoreAllMocks());
 
 describe("Codex GPT-6 Sol/Luna transport", () => {
-  it.each(["gpt-6-sol", "gpt-6-luna"])("lists %s with Codex capabilities", (model) => {
+  it.each(["gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol"])("lists %s with Codex capabilities", (model) => {
     const entry = getModelsByProviderId("codex").find((item) => item.id === model);
     expect(entry?.responsesLite).toBe(true);
     expect(entry?.thinkingLevels).toEqual(["low", "medium", "high", "xhigh", "max"]);
@@ -84,7 +85,11 @@ describe("Codex GPT-6 Sol/Luna transport", () => {
     const body = JSON.parse(options.body);
     expect(url).toBe("https://chatgpt.com/backend-api/codex/responses");
     expect(options.headers["x-openai-internal-codex-responses-lite"]).toBe("true");
-    expect(options.headers.version).toBe("0.155.0");
+    // Read the identity from the registry instead of pinning a literal: it is
+    // the single source for both headers and must be bumped whenever a new
+    // model raises the backend's floor. The floor itself is asserted below.
+    expect(options.headers.version).toBe(codexProvider.transport.headers.version);
+    expect(options.headers["User-Agent"]).toBe(`codex_cli_rs/${codexProvider.transport.headers.version}`);
     expect(body.model).toBe("gpt-6-luna");
     expect(body.instructions).toBe("");
     expect(body.input[0].type).toBe("additional_tools");
@@ -101,5 +106,21 @@ describe("Codex GPT-6 Sol/Luna transport", () => {
     expect(executor.buildHeaders(credentials, true, null, "gpt-5.5")["x-openai-internal-codex-responses-lite"]).toBeUndefined();
     expect(getThinkingLevels("codex", "gpt-6-astra")).toContain("none");
     expect(executor.buildHeaders(credentials, true, null, "gpt-6-astra")["x-openai-internal-codex-responses-lite"]).toBeUndefined();
+  });
+
+  // OpenAI's Codex backend gates model eligibility on the client identity we
+  // send, answering "<model> is not supported when using Codex with a ChatGPT
+  // account" for anything below a model's floor. gpt-6.1-sol needs >= 0.159.0
+  // (0.157/0.158 are refused). Dropping back breaks that model silently.
+  it("declares a Codex CLI identity that meets the gpt-6.1-sol floor", () => {
+    const declared = codexProvider.transport.headers.version;
+    const cmp = (a, b) => {
+      const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+      for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+      return 0;
+    };
+    expect(cmp(declared, "0.159.0")).toBeGreaterThanOrEqual(0);
+    expect(codexProvider.transport.cliVersion).toBe(declared);
+    expect(codexProvider.transport.headers["User-Agent"]).toBe(`codex_cli_rs/${declared}`);
   });
 });

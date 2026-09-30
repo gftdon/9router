@@ -21,6 +21,7 @@
 | `594fcba0` | `tests/vitest.config.js` | LP-011: บังคับ DATA_DIR แยกตอนรันเทส (กัน DB จริงโดนเขียน) | ACTIVE |
 | `cc176d22` | `scripts/backfill-usage-cost.mjs`, `src/lib/db/helpers/dateKey.js` | LP-012: สคริปต์ backfill ยอด cost ย้อนหลัง | ACTIVE |
 | `ba910b94` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/opencode{,-go,-zen}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE |
+| `7fd7ee12`, `d48c12c8` | `open-sse/providers/registry/codex.js`, `open-sse/providers/pricing.js` | LP-014: bump Codex CLI identity → 0.159.0 + เพิ่ม gpt-6.1-sol | ACTIVE |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
@@ -563,6 +564,52 @@ node scripts/backfill-usage-cost.mjs --provider kimi --model 'k3%' --zero-only
 **Install (2026-09-29):** `npm run cli:pack` → `npm install --global ./9router-0.5.91.tgz` (สำรองตัวเก่าที่ `/tmp/9router-global-backup-0.5.91-20260929-155525.tgz`) แล้วเปิดใหม่ผ่าน `launchctl kickstart gui/$(id -u)/com.9router.autostart` → `/api/health` = `{"ok":true}`; schema ดิบ 4 แบบข้างบนผ่าน gateway ได้ 200 ทั้งหมด และ sub-agent `fast-worker` กลับมารันได้ (ก่อนแก้ 400 ทันที)
 
 **เช็คตอน upgrade:** ถ้า upstream เพิ่ม depth/schema sanitizer ของ Muse Spark เอง หรือ Muse ขยาย limit ให้ประเมินว่า patch นี้ยังจำเป็นไหม; ถ้า upstream แยก `normalizeResponsesTools` ออกเป็น helper ร่วม ต้องย้ายการเรียก `capToolSchemasDepth` ตามไปด้วย
+
+---
+
+## LP-014: Codex ปฏิเสธ gpt-6.1-sol เพราะ CLI identity เก่า
+
+**Status:** ACTIVE · **Commits:** `7fd7ee12` (version bump), `d48c12c8` (model + pricing + test) · **Implemented:** 2026-09-30
+
+**อาการ:** เพิ่ม custom model `gpt-6.1-sol` ในแดชบอร์ดแล้วกด Test ได้
+`HTTP 400: {"detail":"The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account."}`
+ทั้งที่บัญชีเดียวกันใช้โมเดลนี้ใน ChatGPT/Codex ได้ปกติ
+
+**Root cause:** ข้อความนี้มาจาก backend ของ OpenAI **ไม่ใช่โค้ดเรา** (grep `not supported when using Codex` ในรีโป = 0 hit)
+OpenAI gate สิทธิ์ใช้โมเดลด้วย **client identity ที่ 9Router ส่งเอง** — `version` และ `User-Agent: codex_cli_rs/<ver>`
+จาก `CODEX_CLI_VERSION` ใน `open-sse/providers/registry/codex.js` ซึ่งยังเป็น `0.155.0`
+`gpt-6.1-sol` (ออก 2026-09-29) ต้องการ **≥ 0.159.0** — 0.157.0/0.158.0 ก็ถูกปฏิเสธ
+
+> ⚠️ **ไม่เกี่ยวกับ codex CLI ที่ติดตั้งในเครื่อง** 9Router ส่ง header พวกนี้เอง ไม่ได้เรียก binary ตัวนั้น
+> (ตอนตรวจ เครื่องมี `codex-cli 0.156.1` อยู่ แต่ไม่มีผลต่อเส้นทางนี้) — comment เดิมในโค้ดที่เขียนว่า
+> "Bump when the installed codex CLI is upgraded" ทำให้เข้าใจผิด จึงแก้ comment ไปด้วย
+
+**Upstream:** [decolua/9router#4471](https://github.com/decolua/9router/issues/4471) — **OPEN** ยังไม่แก้
+ตรวจ `upstream/master` แล้วยังเป็น `0.155.0` และไม่มี `gpt-6.1-sol` (tag ล่าสุดยังเป็น v0.5.91 = ที่เราอยู่) → CASE A
+
+**Change:**
+- `CODEX_CLI_VERSION`: `0.155.0` → `0.159.0` (single source ของทั้ง `version`, `User-Agent`, `cliVersion`)
+- เพิ่ม `{ id: "gpt-6.1-sol", name: "GPT 6.1 Sol", responsesLite: true, thinkingLevels: GPT_6_LITE_THINKING_LEVELS }` ให้เป็น model ในตัว ไม่ต้องเพิ่มเป็น custom model
+  (`responsesLite` ตามรุ่นก่อนหน้า `gpt-6-sol` — มีผลต่อ header `x-openai-internal-codex-responses-lite`, `instructions`, `reasoning.summary`/`context`)
+- pricing `"gpt-6.1-sol"`: 2.00 / cached 0.10 / 10.00 ต่อ 1M (<https://developers.openai.com/api/docs/pricing>)
+  ระดับ `-low/-medium/-high/-xhigh/-max` ไม่ต้องใส่แยก เพราะ LP-008 ตัด suffix ให้แล้ว
+- caps + thinking levels ไม่ต้องแตะ: pattern `*gpt-6*` ใน `capabilities.js:297` และ `thinkingLevels.js:40` ครอบอยู่แล้ว (ตรวจ runtime: ctx 272000, reasoning true, levels low→max)
+
+**Files:** `open-sse/providers/registry/codex.js`, `open-sse/providers/pricing.js`, `tests/unit/codex-gpt6-lite.test.js`
+
+**เทส:** `unit/codex-gpt6-lite.test.js` เดิม pin literal `"0.155.0"` ไว้ → เปลี่ยนให้อ่านจาก registry
+(ซึ่งเป็น single source ที่เทสนี้ควรตรวจจริงๆ) และเพิ่มเคสใหม่ยืนยันว่า version ที่ประกาศ **ห้ามต่ำกว่า 0.159.0**
+กัน revert แล้ว gpt-6.1-sol พังเงียบๆ — 9/9 ผ่าน
+
+**⚠️ เช็คตอน upgrade รอบหน้า:**
+- ถ้า upstream bump `CODEX_CLI_VERSION` เป็น ≥ 0.159.0 เอง → LP-014 ส่วน version = `UPSTREAM_FIXED`
+  แต่ถ้า bump ไปค่าที่ **ต่ำกว่า** floor ของโมเดลที่ใช้อยู่ ต้องคง local patch ไว้ (เทส floor จะจับให้)
+- ถ้า upstream เพิ่ม `gpt-6.1-sol` เอง ให้ลบ entry ซ้ำในของเรา แต่**ตรวจ `responsesLite` กับเรตราคาว่าตรงกัน**ก่อน
+- โมเดลใหม่ของ Codex มักมี version floor ของตัวเอง — อาการเหมือนกันเป๊ะ (HTTP 400 `not supported ... ChatGPT account`)
+  วิธีแก้คือ bump ค่าคงที่ตัวนี้ ไม่ใช่ไปอัปเดต codex CLI ในเครื่อง
+- `tests/__baseline__/providers-baseline.json` pin `User-Agent` ไว้ที่ `0.154.0` ซึ่ง **stale มาตั้งแต่ก่อนแพตช์นี้**
+  (upstream เองก็ 0.155.0 แล้ว) `verify-providers.mjs` จึงแดงอยู่ก่อนหน้าแล้ว ไม่ใช่ regression ของ LP-014
+  ถ้าจะให้ gate นี้เขียว ต้อง re-snapshot ด้วย `tests/__baseline__/snapshot-providers.mjs` แยกต่างหาก
 
 ---
 

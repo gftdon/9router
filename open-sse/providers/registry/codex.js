@@ -1,8 +1,12 @@
 import { withCodexReviewModels } from "../models/helpers.js";
 
 // Codex CLI version seen by OpenAI's backend — single source for the Version /
-// User-Agent identity headers. Bump when the installed codex CLI is upgraded.
-const CODEX_CLI_VERSION = "0.155.0";
+// User-Agent identity headers. 9Router sends these itself, so this is NOT tied
+// to any locally installed codex CLI: the backend gates model eligibility on it
+// and answers "<model> is not supported when using Codex with a ChatGPT account"
+// for anything below a model's floor. gpt-6.1-sol requires >= 0.159.0 (0.157/
+// 0.158 are refused). Bump this when a new model needs a newer client identity.
+const CODEX_CLI_VERSION = "0.159.0";
 const GPT_6_LITE_THINKING_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 
 export default {

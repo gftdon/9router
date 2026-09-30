@@ -601,6 +601,14 @@ OpenAI gate สิทธิ์ใช้โมเดลด้วย **client iden
 (ซึ่งเป็น single source ที่เทสนี้ควรตรวจจริงๆ) และเพิ่มเคสใหม่ยืนยันว่า version ที่ประกาศ **ห้ามต่ำกว่า 0.159.0**
 กัน revert แล้ว gpt-6.1-sol พังเงียบๆ — 9/9 ผ่าน
 
+**Validation (2026-09-30):** `unit/codex-gpt6-lite.test.js` 9/9 ผ่าน; runtime ตรวจ caps/levels ของ `gpt-6.1-sol` ตรงกับ `gpt-6-sol`
+
+**Install (2026-09-30):** สำรอง global ที่ `~/.9router/db/backups/global-9router-pre-lp014-20260930-085646.tar.gz` →
+`npm run cli:pack` → ตรวจ tarball ว่ามี `0.159.0` + `gpt-6.1-sol` และไม่เหลือ `0.155.0` → `npm install --global ./9router-0.5.91.tgz` →
+เปิดใหม่ด้วย `launchctl kickstart -k gui/$(id -u)/com.9router.autostart` → `/api/health` = 200
+**ยืนยันปลายทาง:** `POST /v1/chat/completions` ด้วย `cx/gpt-6.1-sol` ได้ **HTTP 200** (เดิม 400) และบันทึก
+cost = `$0.00504200` (prompt 2496 × $2/1M + completion 5 × $10/1M) ตรงกับเรตทางการ
+
 **⚠️ เช็คตอน upgrade รอบหน้า:**
 - ถ้า upstream bump `CODEX_CLI_VERSION` เป็น ≥ 0.159.0 เอง → LP-014 ส่วน version = `UPSTREAM_FIXED`
   แต่ถ้า bump ไปค่าที่ **ต่ำกว่า** floor ของโมเดลที่ใช้อยู่ ต้องคง local patch ไว้ (เทส floor จะจับให้)

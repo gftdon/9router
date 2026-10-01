@@ -23,7 +23,7 @@
 | `ba910b94` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/opencode{,-go,-zen}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE |
 | `7fd7ee12`, `d48c12c8` | `open-sse/providers/registry/codex.js`, `open-sse/providers/pricing.js` | LP-014: bump Codex CLI identity → 0.159.0 + เพิ่ม gpt-6.1-sol | ACTIVE |
 | `c85dc41e` | `open-sse/config/grokCli.js` (+7 ไฟล์) | LP-015: backport upstream `6b9dc54d` — Grok CLI identity 0.2.99 → 1.0.44 (แก้ HTTP 426) | UPSTREAM_FIXED (backport) |
-| — | grok-cli non-stream response | Bug C: `/v1/messages` + `stream:false` คืน body รูปแบบ OpenAI (ยังไม่ได้แก้) | NEEDS_REVIEW |
+| `8f7c6cde` | `open-sse/handlers/chatCore/{sseToJsonHandler,nonStreamingHandler,claudeMessageBody}.js` | LP-016 (เดิม Bug C): `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน Anthropic `message` แทน chat.completion | ACTIVE |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
@@ -656,6 +656,38 @@ streaming ได้ Anthropic SSE ครบ (`message_start` → `message_stop`)
 - `6b9dc54d` อยู่ใน upstream แล้ว → ตอน rebase **ให้ drop `c85dc41e`** (git จะเห็นเป็น patch ซ้ำหรือว่าง) ไม่ต้อง re-apply
 - ถ้าเจอ 426 อีก วิธีแก้คือ bump `GROK_CLI_VERSION` (ดูเวอร์ชันล่าสุดด้วย `npm view @xai-official/grok version`; ตอนตรวจ = 1.0.46) ไม่ใช่อัปเดต grok CLI ในเครื่อง
 
+## LP-016: `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน body รูปแบบ OpenAI (เดิม Bug C)
+
+**Status:** ACTIVE · **Commit:** `8f7c6cde` · **Applied:** 2026-10-01 · **Upstream:** decolua/9router#3682, #3199, #3462 (ยัง OPEN ตอนตรวจ, ไม่มีโค้ดแก้ใน `upstream/master`) → CASE A
+
+**อาการ:** client รูปแบบ Claude (`POST /v1/messages`, `stream:false`) ที่วิ่งไป provider ซึ่งบังคับ stream ฝั่ง upstream
+(`grok-cli`, `codex` — executor ตั้ง `body.stream = true`) ได้ `{"object":"chat.completion","choices":[...]}` แทน `{"type":"message","content":[...]}`
+→ Anthropic SDK / client non-stream parse ไม่ได้ (Claude Code ไม่โดนเพราะ stream เสมอ); provider ที่ไม่บังคับ stream (เช่น `cc/*`) ปกติ
+
+**Root cause:** เส้น forced-stream ไม่ผ่าน `translateNonStreamingResponse` แต่ไปที่ `handleForcedSSEToJson` (`sseToJsonHandler.js`)
+ซึ่งประกอบ SSE กลับเป็น chat.completion แล้วแปลงต่อเฉพาะกรณี `sourceFormat === OPENAI_RESPONSES` — ไม่มีกิ่งสำหรับ `FORMATS.CLAUDE`
+จึงคืน chat.completion ดิบให้ client Claude ทั้งทาง Responses SSE (grok-cli/codex) และ chat SSE
+
+**วิธีแก้:**
+- ย้าย `openAICompletionToClaudeMessage` (+ `parseToolArguments`) จาก `nonStreamingHandler.js` ไปไฟล์ใหม่ `chatCore/claudeMessageBody.js`
+  (แยกไฟล์เพราะ `nonStreamingHandler` import จาก `sseToJsonHandler` อยู่แล้ว — import กลับจะวน) พฤติกรรมเดิมไม่เปลี่ยน
+- `sseToJsonHandler.js`: ทั้งกิ่ง Responses และกิ่ง chat SSE ถ้า `sourceFormat === FORMATS.CLAUDE` ให้แปลงด้วย `openAICompletionToClaudeMessage`
+  (text / thinking / `tool_use`, `stop_reason` จาก `fromOpenAIFinish`, `usage.input_tokens/output_tokens`); client OpenAI/Responses ได้เหมือนเดิม
+
+**Validation (2026-10-01):** เทสใหม่ `tests/unit/claude-forced-sse-nonstream.test.js` 4/4 (text, function_call→tool_use, OpenAI client ยังได้ chat.completion,
+chat SSE tool call→tool_use); เทสที่เกี่ยวข้อง 52/52; full suite fail 97 เท่าเดิมก่อน/หลัง (ไม่มี regression ใหม่); eslint สะอาด
+
+**Install (2026-10-01):** สำรอง global + SQLite ที่ `/tmp/9router-before-lp016-20261001/` (mode 0700/0600) → `npm run cli:pack` →
+`npm install --global ./9router-0.5.91.tgz` → ปิดตัวเดิม → `launchctl kickstart`; terminal ttys006 เปิดตัวเองซ้ำอีกครั้ง (listener PID 59215 นิ่ง)
+**ยืนยันปลายทาง:** `POST /v1/messages` `stream:false` — `gcli/grok-4.7` และ `cx/gpt-6-astra-low` ได้ `"type":"message"`, `content:[{type:"text",text:"OK"}]`,
+`stop_reason:"end_turn"`, usage ครบ; streaming ทั้งสองตัวยังได้ Anthropic SSE ครบ (`message_start` → `message_stop`)
+
+**⚠️ เช็คตอน upgrade รอบหน้า:**
+- ดูว่า upstream ปิด #3682/#3199/#3462 หรือเพิ่มกิ่ง `FORMATS.CLAUDE` ใน `handleForcedSSEToJson` แล้วหรือยัง — ถ้าแก้ครบ → UPSTREAM_FIXED, drop `8f7c6cde`
+- ถ้า upstream ย้าย/แก้ `openAICompletionToClaudeMessage` ใน `nonStreamingHandler.js` ให้ resolve โดยคง helper ไว้ที่เดียว (ไม่ duplicate)
+- รัน `npx vitest run unit/claude-forced-sse-nonstream.test.js` ทุกครั้ง
+- ยังไม่ได้แก้ (นอก scope): `antigravity` ตอบ SSE กลับมาแม้ client ส่ง `stream:false`
+
 ---
 
 ## Patch ที่ยังไม่ได้แก้ (รอตัดสินใจ)
@@ -677,9 +709,4 @@ streaming ได้ Anthropic SSE ครบ (`message_start` → `message_stop`)
 
 ### Bug C: grok-cli non-stream บน `/v1/messages` คืน body รูปแบบ OpenAI
 
-**สถานะ:** NEEDS_REVIEW — พบระหว่างทดสอบ LP-015 (2026-10-01), ยังไม่ได้วิเคราะห์ root cause
-
-- `POST /v1/messages` + `gcli/grok-4.7-xhigh` + `stream:false` → ได้ `{"object":"chat.completion","choices":[...]}` แทน `{"type":"message","content":[...]}`
-- เทียบ `cc/claude-haiku-4-5-20251001` request เดียวกัน ได้รูปแบบ Anthropic ถูกต้อง → เฉพาะเส้นทาง grok-cli
-- **ไม่กระทบ Claude Code** เพราะ stream เสมอ (stream ได้ Anthropic SSE ครบ) แต่ client ที่เรียก non-stream จะ parse ไม่ได้
-- ยังไม่ได้เช็คว่า upstream เป็นเหมือนกันหรือไม่ — ตรวจก่อนแก้ (อาจเป็น CASE A/B)
+**สถานะ:** แก้แล้ว 2026-10-01 → ย้ายไปเป็น **LP-016** (commit `8f7c6cde`) ดูรายละเอียดด้านบน

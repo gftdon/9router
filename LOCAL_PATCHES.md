@@ -22,6 +22,8 @@
 | `cc176d22` | `scripts/backfill-usage-cost.mjs`, `src/lib/db/helpers/dateKey.js` | LP-012: สคริปต์ backfill ยอด cost ย้อนหลัง | ACTIVE |
 | `ba910b94` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/opencode{,-go,-zen}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE |
 | `7fd7ee12`, `d48c12c8` | `open-sse/providers/registry/codex.js`, `open-sse/providers/pricing.js` | LP-014: bump Codex CLI identity → 0.159.0 + เพิ่ม gpt-6.1-sol | ACTIVE |
+| `c85dc41e` | `open-sse/config/grokCli.js` (+7 ไฟล์) | LP-015: backport upstream `6b9dc54d` — Grok CLI identity 0.2.99 → 1.0.44 (แก้ HTTP 426) | UPSTREAM_FIXED (backport) |
+| — | grok-cli non-stream response | Bug C: `/v1/messages` + `stream:false` คืน body รูปแบบ OpenAI (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
@@ -621,6 +623,41 @@ cost = `$0.00504200` (prompt 2496 × $2/1M + completion 5 × $10/1M) ตรง�
 
 ---
 
+## LP-015: Grok CLI ผ่าน 9Router ได้ HTTP 426 เพราะ CLI identity เก่า (backport จาก upstream)
+
+**Status:** UPSTREAM_FIXED (backport) · **Commit:** `c85dc41e` (cherry-pick `-x` ของ upstream `6b9dc54d`) · **Applied:** 2026-10-01
+
+**อาการ:** เรียก `gcli/grok-4.7-xhigh` / `gcli/grok-4.7` (รวมถึงตัวแรกของ combo `9-deep-reasoner`) แล้ว fail ทุกครั้ง
+`HTTP 426: Your Grok CLI version (0.2.99) is outdated. Please update to version 1.0.13 or later via 'grok update'`
+ใน `usageHistory` ไม่มีแถว `grok-cli` เลยสักแถว เพราะไม่เคยมี request สำเร็จ; connection เองปกติ (token ยังไม่หมดอายุ, `lastError: null`)
+
+**Root cause:** `cli-chat-proxy.grok.com` เริ่มปฏิเสธ client ที่ต่ำกว่า 1.0.13 แต่ 9Router ส่ง identity เองจาก
+`GROK_CLI_VERSION = "0.2.99"` ใน `open-sse/config/grokCli.js` (ใช้ใน `x-grok-client-version` และ `User-Agent: grok-shell/<ver>`)
+เหมือน LP-014 — **ไม่เกี่ยวกับ grok CLI ที่ติดตั้งในเครื่อง** และรีสตาร์ตเฉยๆ ไม่หาย เพราะเป็นค่าคงที่ที่ compile ไว้
+
+**Upstream:** แก้แล้วใน `6b9dc54d` (2026-10-01) — `GROK_CLI_VERSION` → `1.0.44` → CASE B
+แต่ fork ตามหลัง `upstream/master` อยู่ 41 commits จึงเลือก cherry-pick commit เดียวแทน full upgrade (ตามที่ผู้ใช้ตัดสินใจ)
+
+**Files (จาก upstream ทั้งหมด ไม่มีโค้ดเขียนเอง):** `open-sse/config/grokCli.js`, `open-sse/providers/registry/grok-cli.js`,
+`src/app/api/providers/[id]/test/testUtils.js`, `src/lib/oauth/providers/grok-cli.js`, `tests/__baseline__/providers-baseline.json`,
+`tests/unit/grok-cli-{executor,models,usage}.test.js` — cherry-pick ไม่มี conflict
+
+**Validation (2026-10-01):** `unit/grok-cli-{executor,models,usage}.test.js` 40/40 ผ่าน; `verify-providers.mjs` ส่วน grok-cli ตรงแล้ว
+(ยังแดงที่ `codex.headers` ซึ่งเป็นของเดิมตามหมายเหตุใน LP-014 ไม่ใช่ regression)
+
+**Install (2026-10-01):** สำรอง global + SQLite ที่ `/tmp/9router-before-grok426-20261001/` (mode 0700/0600) →
+`npm run cli:pack` → ตรวจ tarball ว่ามี `1.0.44` → `npm install --global ./9router-0.5.91.tgz` → ปิดตัวเดิม (รันมือจาก ttys006) →
+`launchctl kickstart` → `/api/health` = `{"ok":true}`
+⚠️ รีสตาร์ตขณะมี traffic (12 connection) ตามที่ผู้ใช้สั่ง — request ค้างของ session อื่นถูกตัด; terminal ttys006 เปิดตัวเองซ้ำและกลายเป็นตัวที่รันอยู่ (listener PID 10202)
+**ยืนยันปลายทาง:** `POST /v1/messages` ด้วย `gcli/grok-4.7-xhigh` และ `gcli/grok-4.7` ได้ **HTTP 200** (เดิม 426) ตอบ `"OK"`;
+streaming ได้ Anthropic SSE ครบ (`message_start` → `message_stop`); `usageHistory` มีแถว `grok-cli | ok` แถวแรก
+
+**⚠️ เช็คตอน upgrade รอบหน้า:**
+- `6b9dc54d` อยู่ใน upstream แล้ว → ตอน rebase **ให้ drop `c85dc41e`** (git จะเห็นเป็น patch ซ้ำหรือว่าง) ไม่ต้อง re-apply
+- ถ้าเจอ 426 อีก วิธีแก้คือ bump `GROK_CLI_VERSION` (ดูเวอร์ชันล่าสุดด้วย `npm view @xai-official/grok version`; ตอนตรวจ = 1.0.46) ไม่ใช่อัปเดต grok CLI ในเครื่อง
+
+---
+
 ## Patch ที่ยังไม่ได้แก้ (รอตัดสินใจ)
 
 ### Bug A: `reason` injection ใน tool schema ว่าง (gemini/antigravity path)
@@ -637,3 +674,12 @@ cost = `$0.00504200` (prompt 2496 × $2/1M + completion 5 × $10/1M) ตรง�
 
 **ทางแก้ที่เลือกไว้:** ตัด `obj.required = ["reason"]` (ทำให้เป็น optional) หรือ strip `reason` ตอน response
 **หมายเหตุ:** upstream v0.5.45 ขยาย injection ให้ครอบคลุม schema ว่าง `{}` มากขึ้น (commit `e3e3e235`) — bug ยังอยู่และกว้างขึ้น
+
+### Bug C: grok-cli non-stream บน `/v1/messages` คืน body รูปแบบ OpenAI
+
+**สถานะ:** NEEDS_REVIEW — พบระหว่างทดสอบ LP-015 (2026-10-01), ยังไม่ได้วิเคราะห์ root cause
+
+- `POST /v1/messages` + `gcli/grok-4.7-xhigh` + `stream:false` → ได้ `{"object":"chat.completion","choices":[...]}` แทน `{"type":"message","content":[...]}`
+- เทียบ `cc/claude-haiku-4-5-20251001` request เดียวกัน ได้รูปแบบ Anthropic ถูกต้อง → เฉพาะเส้นทาง grok-cli
+- **ไม่กระทบ Claude Code** เพราะ stream เสมอ (stream ได้ Anthropic SSE ครบ) แต่ client ที่เรียก non-stream จะ parse ไม่ได้
+- ยังไม่ได้เช็คว่า upstream เป็นเหมือนกันหรือไม่ — ตรวจก่อนแก้ (อาจเป็น CASE A/B)

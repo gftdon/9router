@@ -8,11 +8,11 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-027 + เอกสาร (LP-028..LP-030 รอ push) |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `cb1a19d1` (LP-017..LP-030) |
-| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `cb1a19d1`, deploy LP-028..LP-030 2026-10-03 02:2x) — request logs **ปิด** |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-031 + เอกสาร |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `baedc557` (LP-017..LP-031) |
+| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `baedc557`, deploy LP-031 2026-10-03 02:18) — request logs **ปิด** |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
-| ค้างตรวจ | Responses upstream ที่ส่ง `event: error` กลาง stream หลัง HTTP 200 (เช่น `ocg/gpt-6-luna` โดน Azure `rate_limit_exceeded` ~50% ตอน probe 2026-10-03) → 9Router คืนผลว่าง (`status:"in_progress"`) แทน error ทำให้ combo ไม่ fallback — ยังไม่แก้ |
+| ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `baedc557` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js` | LP-031: Responses upstream ส่ง `event: error` / `response.failed` หลัง HTTP 200 → client non-stream ได้ error (429 สำหรับ rate limit, 502 อื่นๆ) แทน 200 ว่าง เพื่อให้ account/combo fallback | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `df7999a5` | `open-sse/executors/muse.js` | LP-028: ย้าย effort เข้า `reasoning` เมื่อ Responses body มี `input` เป็น string (แก้ LP-018) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `6a389c60` | `open-sse/handlers/chatCore.js` | LP-029: provider ที่ forceStream แต่ตอบ JSON ธรรมดา → ใช้ handler non-stream แทนการห่อ JSON เป็น SSE | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `cb1a19d1` | `open-sse/handlers/chatCore.js` | LP-030: upstream รูปแบบ Responses ที่ส่ง SSE ให้ client non-stream → แปลงด้วย SSE→JSON handler (เดิมได้ chat.completion ว่าง) | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -1069,9 +1070,30 @@ Claude Code จริง `9-haiku-level` เรียก `TaskList` 3/3 ได�
 **Deploy + live (2026-10-03 02:2x):** สำรองที่ `/tmp/9router-before-lp028-030-20261003/` → ติดตั้ง build `cb1a19d1` → nohup (logs ปิด) → `/v1/responses`:
 `muse/…(max)` non-stream `application/json` `object:"response"` echo `effort:"max"` ✅ / stream ✅; `muse/…` non-stream JSON ✅; `ocg/muse-spark…(max)` non-stream ได้ข้อความ ✅ / stream echo `max` ✅;
 `cx/gpt-6.1-sol-high` ปกติ; `/v1/messages` ของ `ocg/` และ `muse/` stream + non-stream 200 ตอบถูก
-`ocg/gpt-6-luna` บางครั้งยังว่าง — **ไม่ใช่ปัญหาของ patch นี้:** ยิงตรง OpenCode Go 3/6 ครั้งได้ HTTP 200 แล้ว `event: error` `rate_limit_exceeded` (Azure westus3) ทันทีหลัง `response.created` (ดูตาราง "ค้างตรวจ")
+`ocg/gpt-6-luna` บางครั้งยังว่าง — **ไม่ใช่ปัญหาของ patch นี้:** ยิงตรง OpenCode Go 3/6 ครั้งได้ HTTP 200 แล้ว `event: error` `rate_limit_exceeded` (Azure westus3) ทันทีหลัง `response.created` → แก้ฝั่งเราใน LP-031
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream แก้ทาง forceStream/Responses non-stream ใน chatCore เอง → เทียบแล้วประเมินทีละตัว
+
+---
+
+## LP-031: error กลาง stream ของ Responses upstream → client non-stream ได้ 200 ว่าง
+
+**Status:** ACTIVE · **Commit:** `baedc557` · **Implemented:** 2026-10-03 · ต่อจากข้อสังเกตตอนยืนยัน LP-030
+
+**อาการ:** `ocg/gpt-6-luna` แบบ non-stream บางครั้งได้ HTTP 200 `status:"in_progress"` `output:[]` usage 0
+**Root cause:** OpenCode Go ตอบ HTTP 200 แล้วส่ง `event: error` `{"type":"too_many_requests","code":"rate_limit_exceeded",…}` (Azure token rate limit) ทันทีหลัง `response.created`
+`convertResponsesStreamToJson` ไม่รู้จัก event `error` (และทิ้ง `response.error` ของ `response.failed`) → `handleForcedSSEToJson` ตอบ success → chat.js ไม่เรียก `markAccountUnavailable` → combo ไม่ fallback
+**แก้:** converter เก็บ error จาก `error` / `response.failed` (status `failed` + `error`); handler คืน `createErrorResult` — status จาก `error.status` ถ้ามี (400–599),
+`rate_limit` / `too_many_requests` → 429, อื่นๆ → 502 · ใช้กับทุก client format (Responses/Claude/OpenAI) และทุก provider ที่ผ่าน Responses SSE→JSON (codex, muse, grok, ocg)
+**ขอบเขต:** เฉพาะ client non-stream — client ที่ stream ยังได้ event error ตามที่ upstream ส่ง (ไม่ได้แตะ)
+
+**Tests:** `tests/unit/opencode-go-responses-nonstream.test.js` +2 (rate-limit `error` → 429 ทั้ง 3 client format; `response.failed` → 502) — แดงทั้ง 2 เมื่อไม่มี fix
+**Validation (2026-10-03):** full suite เทียบรายข้อ: ไม่มี fail ใหม่ (100 fail เท่าเดิม, pass +2); eslint ผ่าน
+**Deploy + live (2026-10-03 02:18):** สำรองที่ `/tmp/9router-before-lp031-20261003/` → ติดตั้ง build `baedc557` → nohup (logs ปิด) → `/v1/responses` `ocg/gpt-6-luna` 6 ครั้ง:
+3 ครั้งแรก 200 `completed` ตอบถูก; ครั้งที่ 4 upstream rate limit → ได้ error (account loop ล็อก `modelLock_gpt-6-luna` 2 วิ backoff 1 → client ได้ 503 "all accounts unavailable");
+ครั้ง 5–6 ได้ 503 ระหว่าง cooldown — ไม่มี 200 ว่างอีก
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เพิ่มการจัดการ `error` event ใน `streamToJsonConverter.js` / `sseToJsonHandler.js` เอง → เทียบแล้วตัด patch
 
 ---
 

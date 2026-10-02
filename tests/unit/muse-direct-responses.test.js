@@ -121,6 +121,18 @@ describe("muse direct provider effort levels", () => {
     expect(wire.body.reasoning).toMatchObject({ effort: "max" });
   });
 
+  // A Responses client may send `input` as a plain string; the effort was left
+  // as top-level reasoning_effort and Meta 400'd "unknown parameter". (LP-028)
+  it("moves (max) into reasoning.effort for a string-input Responses client", async () => {
+    const wire = await captureWire({
+      endpoint: "/v1/responses",
+      body: { model: `${MODEL}(max)`, input: "Say hi.", stream: true },
+      model: `${MODEL}(max)`,
+    });
+    expect(wire.body.reasoning_effort).toBeUndefined();
+    expect(wire.body.reasoning).toMatchObject({ effort: "max" });
+  });
+
   // OpenCode Go serves the same model and lists the same set (probed live
   // 2026-10-03); its openai default used to cap (max) to xhigh too. (LP-027)
   it("publishes the same level set for opencode-go's muse-spark", async () => {

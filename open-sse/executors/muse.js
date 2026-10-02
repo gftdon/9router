@@ -13,7 +13,8 @@ export class MuseExecutor extends DefaultExecutor {
 
   transformRequest(model, body, stream, credentials) {
     const out = super.transformRequest(model, body, stream, credentials);
-    if (!out || typeof out !== "object" || !Array.isArray(out.input)) return out;
+    // Responses bodies only; `input` may be a string as well as an item array (LP-028).
+    if (!out || typeof out !== "object" || out.input === undefined) return out;
     if (out.reasoning_effort !== undefined && out.reasoning === undefined) {
       out.reasoning = { effort: out.reasoning_effort, summary: "auto" };
     }

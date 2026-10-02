@@ -98,8 +98,15 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   // whose wire format has no supported transport (for example MiniMax-M3:
   // OpenAI clients should stay on /chat/completions; other clients can fall
   // back to its declared Claude target).
-  const targetFormat = useTransport?.format || modelTargetFormat || getTargetFormat(provider, credentials);
-  if (useTransport && credentials) credentials.runtimeTransport = useTransport;
+  const defaultFormat = getTargetFormat(provider, credentials);
+  const targetFormat = useTransport?.format || modelTargetFormat || defaultFormat;
+  // LP-017: when the model's targetFormat (not the client's) picks the wire and
+  // it differs from the default endpoint, send to the transport for that format
+  // too — otherwise a Responses body lands on /chat/completions (Muse: HTTP 400
+  // "unknown parameter `input`"). Same-format cases keep the default endpoint.
+  const wireTransport = useTransport
+    || (targetFormat !== defaultFormat ? resolveTransport(provider, targetFormat) : null);
+  if (wireTransport && credentials) credentials.runtimeTransport = wireTransport;
   const stripList = getModelStrip(alias, model);
   const upstreamModel = getModelUpstreamId(alias, model);
 

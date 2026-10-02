@@ -13,7 +13,7 @@
 | Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`) — **ไม่ได้**รันจาก LaunchAgent / terminal |
 | Request logs | เปิดอยู่ → `~/.local/lib/node_modules/9router/app/logs/` เก็บ `x-api-key` แบบ plaintext — ปิดและลบเมื่อดีบักเสร็จ |
 | ค้างตรวจ | Bug A (gemini `reason`), Bug D (antigravity non-stream), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh |
-| LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) — wire ยืนยันจาก request log แล้ว แต่ live test กับ Anthropic ติด 429 rate limit ยังไม่ได้คำตอบ 200 แบบ Claude Code |
+| LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — ดู Bug E สำหรับ signature ที่ไม่ว่างของ kimi |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
 
@@ -42,7 +42,7 @@
 | `d0da91c0` | `open-sse/executors/muse.js` | LP-013 (ขยาย): จำกัดความลึก tool schema ให้ provider `muse` ตรงด้วย | ACTIVE |
 | `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE |
 | `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | ACTIVE |
-| `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy แล้ว; ยืนยันฝั่ง Anthropic ยังค้าง) |
+| `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy + ยืนยัน live แล้ว; ไม่ครอบคลุม signature ของ kimi → ดู Bug E) |
 | — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -827,7 +827,7 @@ request log ยืนยัน wire = `https://api.meta.ai/v1/responses`, `reaso
 
 ## LP-021: Claude 400 `Invalid signature in thinking block` ใน session ของ combo ที่เคยตกไปโมเดลอื่น
 
-**Status:** ACTIVE (deploy 2026-10-03; ยืนยัน 200 ฝั่ง Anthropic ยังค้าง) · **Commit:** `2735ef3a` · **Implemented:** 2026-10-02 · **ต่อยอดจาก:** LP-003 (`b35cdcac`)
+**Status:** ACTIVE (deploy + ยืนยัน live 2026-10-03) · **Commit:** `2735ef3a` · **Implemented:** 2026-10-02 · **ต่อยอดจาก:** LP-003 (`b35cdcac`)
 
 **พบจาก:** ตรวจ request log หลังเปิด `ENABLE_REQUEST_LOGS` (20:50–21:40, 116 request) — error จริงครั้งเดียว 21:03:41
 combo `9-orchestrator` → `cc/claude-opus-5-5(medium)` ได้ `400 invalid_request_error: messages.3.content.0: Invalid \`signature\` in \`thinking\` block`
@@ -860,6 +860,16 @@ turn ที่ว่างหลังทิ้งจะถูกขั้นถ
   ส่วน request UA curl ที่ผ่าน 200 ถูก cloak ครบ (billing header + metadata + session id) ใน `4_req_target.json`
   ทดสอบ "curl ก็ 429" ช่วง 00:03 ไม่มี log เพราะถูก `modelLock` ของ 9Router ตีกลับก่อนถึง Anthropic
   ผลกระทบต่อ Claude Code จริง: ไม่มี (ส่ง billing header/metadata เอง; claude ผ่าน `9-orchestrator` 37 request ok ในช่วง log 20:50–21:40)
+- **ยืนยันด้วย Claude Code จริง (2.1.287, 00:14):** session ใน `/tmp/lp021-cc` เทิร์น 1 `kimi/kimi-k3(max)` → resume เทิร์น 2 `cc/claude-opus-5-5` = 200 ("400")
+  แต่ Claude Code **ตัด thinking ของโมเดลอื่นทิ้งเองเมื่อเปลี่ยนชื่อ model** (client body เทิร์น 2 ไม่มี thinking) จึงยังไม่โดน LP-021 —
+  bug จริงเกิดเฉพาะเมื่อชื่อ model คงเดิม (combo `9-orchestrator`) แต่ fallback ไปตอบด้วยโมเดลอื่น
+  จึง replay request จริงของเทิร์น 2 (header + billing header + metadata ของ Claude Code ครบ) ผ่าน 9Router โดยใส่ thinking ใน assistant turn:
+  | variant | ผล |
+  |---|---|
+  | A: ไม่แก้ (control) | 200, ตอบ "400", `message_stop` |
+  | B: thinking `signature: ""` (กรณี 21:03) | **200** — LP-021 ทิ้ง block แล้ว Anthropic รับ ✅ |
+  | C: thinking ที่มี signature จริงของ kimi (4,340 ตัวอักษร, ไม่ว่าง) | **400 `Invalid signature in thinking block`** ❌ → Bug E |
+
 - **ด้วย UA อื่น (curl):** HTTP 200 ตอบถูก ("400") แต่เส้นนี้ 9Router ตัด thinking ของเทิร์นก่อนทิ้งทั้งหมดอยู่แล้ว (พฤติกรรม upstream สำหรับ client ที่ไม่ใช่ Claude Code) จึงไม่ได้ทดสอบ LP-021 จริง
 - ⚠️ ทุกครั้งที่ 429, 9Router ตั้ง `modelLock_claude-opus-5-5` ใหม่ (~2 วินาทีถึงนาที) → หยุดยิงทดสอบซ้ำเพื่อไม่ให้ session อื่นโดน lock ต่อ
 - **ค้าง:** ยิง request แบบ Claude Code ซ้ำเมื่อ rate limit หาย แล้วต้องได้ 200; หรือดูจาก log ว่า session ยาวของ `9-orchestrator` ไม่เจอ 400 `Invalid signature` อีก
@@ -890,6 +900,14 @@ turn ที่ว่างหลังทิ้งจะถูกขั้นถ
 ### Bug C: grok-cli non-stream บน `/v1/messages` คืน body รูปแบบ OpenAI
 
 **สถานะ:** แก้แล้ว 2026-10-01 → ย้ายไปเป็น **LP-016** (commit `8f7c6cde`) ดูรายละเอียดด้านบน
+
+### Bug E: thinking ที่มี signature ของโมเดลอื่น (ไม่ว่าง) ยังทำให้ Claude 400
+
+**สถานะ:** NEEDS_REVIEW — พบตอนยืนยัน LP-021 (2026-10-03)
+- kimi (`kimi/kimi-k3`) ส่ง thinking กลับมาพร้อม signature ของตัวเอง (ไม่ว่าง) Claude Code เก็บไว้ใน session; ถ้า combo ชื่อเดิม (เช่น `9-orchestrator` = claude → kimi → …)
+  fallback ไป kimi แล้วเทิร์นถัดไปกลับมาที่ Claude → Anthropic 400 `Invalid signature in thinking block` (พิสูจน์ด้วย replay variant C ด้านบน)
+- LP-021 ทิ้งแค่ signature ว่าง; LP-003 ตั้งใจไม่ใช้ prefix heuristic เพราะเคยทิ้ง signature แบบใหม่ของ Claude ผิด → แยก signature ของ Claude กับของโมเดลอื่นจากรูปแบบไม่ได้อย่างปลอดภัย
+- ทางเลือกที่พิจารณา: (1) retry ครั้งเดียวโดยตัด thinking ของเทิร์นก่อนๆ ออกเมื่อเจอ 400 นี้ (fail-safe ไม่ต้องเดารูปแบบ) (2) 9Router จำ signature ที่ได้จาก provider ที่ไม่ใช่ Claude แล้วทิ้งตอนส่ง Claude (3) ตัดที่ฝั่งรับ — ไม่ส่ง signature ของ kimi กลับให้ client
 
 ### Bug D: antigravity non-stream บน `/v1/messages` คืน body รูปแบบ OpenAI
 

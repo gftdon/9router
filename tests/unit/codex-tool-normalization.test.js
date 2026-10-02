@@ -201,3 +201,25 @@ describe("CodexExecutor tool normalization", () => {
     ]);
   });
 });
+
+// LP-025: the Codex backend treats a function tool without `strict` as strict and
+// the model then fills every optional argument; Codex CLI sends strict:false.
+describe("CodexExecutor function tool strict flag (LP-025)", () => {
+  const params = { type: "object", properties: { a: { type: "string" }, b: { type: "number" } }, required: ["a"] };
+
+  it("defaults strict to false for flat and Chat-Completions function tools", () => {
+    const tools = normalizeTools([
+      { type: "function", name: "Agent", description: "spawn", parameters: params },
+      { type: "function", function: { name: "Read", description: "read", parameters: params } },
+    ]);
+    expect(tools.map((t) => [t.name, t.strict])).toEqual([["Agent", false], ["Read", false]]);
+  });
+
+  it("keeps an explicit strict value from the client", () => {
+    const tools = normalizeTools([
+      { type: "function", name: "Strict", parameters: { ...params, required: ["a", "b"], additionalProperties: false }, strict: true },
+      { type: "function", function: { name: "Loose", parameters: params, strict: false } },
+    ]);
+    expect(tools.map((t) => [t.name, t.strict])).toEqual([["Strict", true], ["Loose", false]]);
+  });
+});

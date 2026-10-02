@@ -109,11 +109,16 @@ function normalizeCodexTools(body) {
     const parameters = (tool.parameters && typeof tool.parameters === "object" && !Array.isArray(tool.parameters))
       ? tool.parameters
       : (fn?.parameters && typeof fn.parameters === "object" && !Array.isArray(fn.parameters) ? fn.parameters : { type: "object", properties: {} });
+    // LP-025: without an explicit `strict`, the Codex backend constrains calls as if
+    // strict and the model fills every optional argument (Agent model/isolation,
+    // Read offset/limit...). Keep the client's choice; default to false like Codex CLI.
+    const strict = typeof tool.strict === "boolean" ? tool.strict : (typeof fn?.strict === "boolean" ? fn.strict : false);
     for (const k of Object.keys(tool)) delete tool[k];
     tool.type = "function";
     tool.name = name.slice(0, 128);
     if (description) tool.description = description;
     tool.parameters = stripCodexUnsupportedPatterns(parameters, patternStats);
+    tool.strict = strict;
     validNames.add(name);
     return true;
   });

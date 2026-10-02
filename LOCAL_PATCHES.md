@@ -8,11 +8,11 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-023 + เอกสาร |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `0a8e550c` (LP-017..LP-023) |
-| Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`, ตั้งแต่ deploy LP-023 `0a8e550c` 2026-10-03 00:5x) — **ไม่ได้**รันจาก LaunchAgent / ttys006 |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-025 + เอกสาร |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `a5027546` (LP-017..LP-025) |
+| Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`, ตั้งแต่ deploy LP-024/LP-025 `a5027546` 2026-10-03 01:2x) — **ไม่ได้**รันจาก LaunchAgent / ttys006 |
 | Request logs | เปิดอยู่ → `~/.local/lib/node_modules/9router/app/logs/` เก็บ `x-api-key` แบบ plaintext — ปิดและลบเมื่อดีบักเสร็จ |
-| ค้างตรวจ | Bug A (gemini `reason`), Bug D (antigravity non-stream), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh; `glm/glm-5.3` ติดโควตา 5 ชม. ของบัญชี (ไม่ใช่โค้ด) ตอนทดสอบ 2026-10-03 |
+| ค้างตรวจ | Bug A (gemini `reason`), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh; `glm/glm-5.3` ติดโควตา 5 ชม. ของบัญชี (ไม่ใช่โค้ด) ตอนทดสอบ 2026-10-03 |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
@@ -45,8 +45,8 @@
 | `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy + ยืนยัน live แล้ว; ไม่ครอบคลุม signature ของ kimi → LP-022) |
 | `5c96c99e`, `4e8d2f28` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (deploy + ยืนยัน live ทั้ง 2 commit) |
 | `0a8e550c` | `open-sse/utils/stream.js`, `open-sse/handlers/chatCore/streamingHandler.js` | LP-023: stream Claude→Claude (passthrough) ถอดชื่อ tool ที่ถูก cloak (`_ide`) กลับ | ACTIVE (deploy + ยืนยัน live แล้ว) |
-| `35f6bbe9` | `open-sse/executors/codex.js` | LP-025: ส่ง `strict:false` ให้ function tool ของ Codex เมื่อ client ไม่ได้ระบุ (กัน codex ใส่ optional argument ครบทุกตัว) | ACTIVE (ยังไม่ deploy) |
-| — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
+| `a5027546` | `open-sse/handlers/chatCore/nonStreamingHandler.js` | LP-024 (เดิม Bug D): non-stream ที่ target เป็น Gemini/Antigravity/Claude/Ollama แปลงต่อจาก chat.completion เป็นรูปแบบของ client (Claude message / Responses) | ACTIVE (deploy + ยืนยัน live แล้ว) |
+| `35f6bbe9` | `open-sse/executors/codex.js` | LP-025: ส่ง `strict:false` ให้ function tool ของ Codex เมื่อ client ไม่ได้ระบุ (กัน codex ใส่ optional argument ครบทุกตัว) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
 
@@ -938,9 +938,35 @@ request log: `4_req_target` ยังเป็น `calc_ide` (cloak ทำงา
 
 ---
 
+## LP-024: non-stream คืน chat.completion ให้ client Claude/Responses เมื่อ target เป็น Gemini/Antigravity/Claude/Ollama (เดิม Bug D)
+
+**Status:** ACTIVE · **Commit:** `a5027546` · **Implemented:** 2026-10-03 · **Upstream:** ยังไม่แก้ (v0.5.95) — CASE A · **ต่อยอด:** LP-016 (คนละเส้นทาง)
+
+**อาการ:** `POST /v1/messages` + `stream:false` (หรือ SDK ที่ส่ง `Accept: application/json`) ไป `ag/…` หรือ combo ที่ตกไป ag (`9-haiku-level`, `9-browser-task`, `9-content-scoring`, `9-fast-worker`)
+→ ได้ `{"object":"chat.completion","choices":[…],"usage":{}}` — ไม่มี `content`/`stop_reason`, tool call อยู่ใน `choices[].message.tool_calls`, `usage` ถูก `filterUsageForFormat(…, claude)` กรองจนว่าง
+ไม่กระทบ Claude Code (ใช้ stream) และไม่กระทบสถิติ dashboard (`extractUsageFromResponse` อ่าน body ดิบ)
+
+**Root cause:** `translateNonStreamingResponse` (`nonStreamingHandler.js`) แปลง target → OpenAI แล้ว `return` ทันทีในทุก branch ของ Gemini/Antigravity/Vertex, Claude และ Ollama
+ขา OpenAI → client มีแค่กรณี target = OpenAI (Responses / Claude) — request log: `5_res_provider` = Gemini JSON, `7_res_client` = chat.completion
+
+**วิธีแก้:** ย้ายตัวแปลงเดิมเป็น `translateProviderBodyToOpenAI` แล้ว `translateNonStreamingResponse` แปลงต่อเมื่อ target ≠ OpenAI, target ≠ source และผลมี `choices`:
+client Claude → `openAICompletionToClaudeMessage` (ตัวเดียวกับ LP-016), client Responses → `openAICompletionToResponses` — client OpenAI เหมือนเดิม
+(thinking ของ Gemini กลายเป็น thinking block ไม่มี signature → ถ้าส่งกลับไป Claude ภายหลัง LP-021 ทิ้งให้)
+
+**Validation (2026-10-03):** เทสใหม่ `tests/unit/nonstream-client-format.test.js` 6 ข้อ (ag ข้อความ, ag functionCall + thought, gemini → Responses, ollama → Claude, client OpenAI ไม่เปลี่ยน, ผ่าน `handleNonStreamingResponse` ได้ usage ไม่ว่าง) — 5 ข้อแดงเมื่อไม่มี fix;
+full suite เทียบรายข้อ: ไม่มี fail ใหม่
+**Deploy + live (2026-10-03 01:2x):** สำรองที่ `/tmp/9router-before-lp024-025-20261003/` (ไม่รวม logs) → ปิด launcher/server (nohup) → ติดตั้ง build `a5027546` (logs เดิมหายไปกับการแทนที่โฟลเดอร์)
+→ เปิด `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` แบบ nohup → `ag/gemini-3.8-flash-high`, `9-haiku-level`, `9-browser-task` non-stream ได้ `type:"message"` + `stop_reason`;
+ag + tool ได้ `tool_use` + `stop_reason:"tool_use"`; client `/v1/responses` non-stream ได้ `object:"response"` + `usage`; matrix ทุกโมเดล stream/non-stream 200
+(หมายเหตุ: ไม่ใส่ `stream` และไม่ส่ง `Accept: application/json` → upstream ถือเป็น stream (`body.stream !== false`) — SDK จริงส่ง Accept จึงได้ JSON; ไม่ใช่บั๊ก)
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เพิ่มขา OpenAI → client ใน `translateNonStreamingResponse` เอง → UPSTREAM_FIXED
+
+---
+
 ## LP-025: Codex ใส่ optional argument ของ tool ครบทุกตัว (Agent `model`/`isolation:"worktree"`, Read `offset/limit` …)
 
-**Status:** ACTIVE (commit แล้ว ยังไม่ deploy) · **Commit:** `35f6bbe9` · **Implemented:** 2026-10-03 · **Upstream:** ยังไม่แก้ (v0.5.95)
+**Status:** ACTIVE · **Commit:** `35f6bbe9` (deploy พร้อม LP-024 ใน build `a5027546`) · **Implemented:** 2026-10-03 · **Upstream:** ยังไม่แก้ (v0.5.95)
 (LP-024 จองไว้ให้ Bug D)
 
 **อาการ (ทดสอบ `9-orchestrator` ที่ย้าย `cx/gpt-6.1-sol-high` ขึ้นเป็นตัวแรก 2026-10-03):** ทุก tool call ของ codex ใส่ optional ครบ
@@ -959,6 +985,10 @@ request log: `4_req_target` ยังเป็น `calc_ide` (cloak ทำงา
 **Validation (2026-10-03):** `codex-tool-normalization` +2 เทส (default false, คงค่าที่ client ระบุ) — แดงเมื่อไม่มี fix;
 `codex-gpt6-lite` เทส web_search เทียบ shape tool แบบตรงตัว → เพิ่ม `strict:false` ในค่าที่คาด (เจตนาเดิมคือ web_search ยังอยู่);
 full suite เทียบรายข้อ: ไม่มี fail ใหม่ (`lists gpt-6.1-sol with Codex capabilities` แดงอยู่ก่อนแล้ว — contextWindow 1,050,000 vs 272,000)
+
+**Live (2026-10-03 01:2x, build `a5027546`):** Claude Code จริง `9-orchestrator` (cx-sol นำ) สั่ง fast-worker + deep-reasoner:
+Agent ส่งแค่ `description`, `subagent_type`, `name` (ไม่มี `model`/`isolation`/`mode`/`team_name`), Read ส่งแค่ `file_path` (ใส่ `offset/limit` เฉพาะตอนต้องการจริง),
+`4_req_target` ทุก request มี `strict:false`; คำตอบ subagent ถูก (chatCore มี `.js` 5 ไฟล์); ไม่มี worktree ค้าง
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เริ่มส่ง `strict` เองใน codex executor หรือ translator → เทียบแล้วประเมิน UPSTREAM_FIXED
 
@@ -987,7 +1017,9 @@ full suite เทียบรายข้อ: ไม่มี fail ใหม่ 
 
 ### Bug E → แก้แล้วเป็น LP-022 (ดูหัวข้อ LP-022 ด้านบน)
 
-### Bug D: antigravity non-stream บน `/v1/messages` คืน body รูปแบบ OpenAI
+### Bug D → แก้แล้วเป็น LP-024 (ดูหัวข้อ LP-024 ด้านบน) — บันทึกเดิม:
+
+#### Bug D: antigravity non-stream บน `/v1/messages` คืน body รูปแบบ OpenAI
 
 **สถานะ:** NEEDS_REVIEW — พบระหว่าง live probe หลังอัปเดต v0.5.95 (2026-10-02), ยังไม่ได้วิเคราะห์ root cause (นอกขอบเขต upgrade)
 

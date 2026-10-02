@@ -8,9 +8,9 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบ — v0.5.95 merge + audit (`d3053f85`), LP-017..LP-020 (`2b5bcbac`) |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `b528c903` (โค้ดเท่ากับ HEAD; commit หลังจากนั้นเป็น docs) |
-| Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`) — **ไม่ได้**รันจาก LaunchAgent / terminal |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-022 + เอกสาร |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `4e8d2f28` (LP-017..LP-022) |
+| Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`, ตั้งแต่ deploy LP-022 `4e8d2f28` 2026-10-03) — **ไม่ได้**รันจาก LaunchAgent / ttys006 |
 | Request logs | เปิดอยู่ → `~/.local/lib/node_modules/9router/app/logs/` เก็บ `x-api-key` แบบ plaintext — ปิดและลบเมื่อดีบักเสร็จ |
 | ค้างตรวจ | Bug A (gemini `reason`), Bug D (antigravity non-stream), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -43,7 +43,7 @@
 | `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE |
 | `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | ACTIVE |
 | `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy + ยืนยัน live แล้ว; ไม่ครอบคลุม signature ของ kimi → LP-022) |
-| `5c96c99e`, `4e8d2f28` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (`5c96c99e` deploy + ยืนยันแล้ว; `4e8d2f28` ยังไม่ deploy) |
+| `5c96c99e`, `4e8d2f28` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (deploy + ยืนยัน live ทั้ง 2 commit) |
 | — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -881,7 +881,7 @@ turn ที่ว่างหลังทิ้งจะถูกขั้นถ
 
 ## LP-022: thinking ที่มี signature ของโมเดลอื่น (ไม่ว่าง) ทำให้ Claude 400 — retry โดยตัด thinking
 
-**Status:** ACTIVE · **Commits:** `5c96c99e` (deploy + ยืนยัน live 2026-10-03), `4e8d2f28` (ปรับเงื่อนไขปิด thinking — ยังไม่ deploy) · **Implemented:** 2026-10-03 · **เดิม:** Bug E · **ต่อยอด:** LP-003, LP-021
+**Status:** ACTIVE · **Commits:** `5c96c99e` (deploy + ยืนยัน live 2026-10-03), `4e8d2f28` (ปรับเงื่อนไขปิด thinking — deploy + ยืนยัน live 2026-10-03) · **Implemented:** 2026-10-03 · **เดิม:** Bug E · **ต่อยอด:** LP-003, LP-021
 
 **อาการ:** combo ชื่อเดิม (เช่น `9-orchestrator` = claude → kimi → …) fallback ไป kimi; kimi ส่ง thinking พร้อม signature ของตัวเอง (ไม่ว่าง) Claude Code เก็บไว้
 → เทิร์นต่อมากลับไป Claude → 400 `Invalid \`signature\` in \`thinking\` block` (replay variant C ใน LP-021) LP-021 ทิ้งได้แค่ signature ว่าง
@@ -900,7 +900,10 @@ turn ที่ว่างหลังทิ้งจะถูกขั้นถ
 **Install + live (2026-10-03 00:2x):** สำรองที่ `/tmp/9router-before-lp022-20261003/` (ไม่รวม logs) → ติดตั้ง build `5c96c99e` → ปิด launcher/server → ลบ request logs
 → ผู้ใช้เปิดใหม่ที่ ttys006 (`ENABLE_REQUEST_LOGS=true`) → replay request จริงของ Claude Code (`/tmp/lp021-cc`): **A 200, B 200, C 200** (ตอบ "400", `message_stop`)
 C: request log `4_req_target.json` = assistant `text` ไม่มี thinking (retry ทำงาน) แต่ `thinking` ถูกปิดทั้งที่ turn ล่าสุดจบด้วยข้อความ → แก้ใน `4e8d2f28`
-(full suite 106 เท่าเดิม; เทสเพิ่ม assertion ว่า turn ข้อความยังเปิด thinking + คง `clear_thinking`) — `4e8d2f28` ยังไม่ได้ build/deploy
+(full suite 106 เท่าเดิม; เทสเพิ่ม assertion ว่า turn ข้อความยังเปิด thinking + คง `clear_thinking`)
+**Deploy `4e8d2f28` (2026-10-03 00:3x):** สำรองที่ `/tmp/9router-before-lp022b-20261003/` (ไม่รวม logs) → ปิด launcher/server ที่ ttys006 (ไม่มี connection ค้าง)
+→ ติดตั้ง (request logs เดิมหายไปกับการแทนที่โฟลเดอร์ package) → เปิดใหม่ `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` แบบ nohup (log `/tmp/9router.log`, **ไม่ได้**รันใน ttys006)
+→ replay **A 200, B 200, C 200**; request log ของ C: assistant `text` ไม่มี thinking block และ `thinking: {type: "adaptive"}` **ยังเปิดอยู่** ✅
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** เทียบกับวิธีที่ upstream จัดการ signature ต่างโมเดล; ถ้า upstream เพิ่ม `executor.execute` จุดใหม่ เทส source-scan จะต้องนับใหม่
 

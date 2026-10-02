@@ -3,6 +3,17 @@
 > เอกสารนี้บันทึก patch ที่เราแก้เองบน fork (`gftdon/9router`) แต่ยังไม่ได้ขึ้น upstream (`decolua/9router`)
 > **ทุกครั้งที่อัปเดต 9router เวอร์ชันใหม่ ให้เช็คไฟล์นี้ก่อน** — ถ้า patch ถูกเขียนทับ ให้ re-apply ตามขั้นตอนด้านล่างของแต่ละเคส
 
+## สถานะปัจจุบัน (อัปเดต 2026-10-02)
+
+| รายการ | ค่า |
+|---|---|
+| Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
+| `origin/master` (`gftdon/9router`) | push ครบ — v0.5.95 merge + audit (`d3053f85`), LP-017..LP-020 (`2b5bcbac`) |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `b528c903` (โค้ดเท่ากับ HEAD; commit หลังจากนั้นเป็น docs) |
+| Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`) — **ไม่ได้**รันจาก LaunchAgent / terminal |
+| Request logs | เปิดอยู่ → `~/.local/lib/node_modules/9router/app/logs/` เก็บ `x-api-key` แบบ plaintext — ปิดและลบเมื่อดีบักเสร็จ |
+| ค้างตรวจ | Bug A (gemini `reason`), Bug D (antigravity non-stream), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh |
+
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
 
 | Commit | ไฟล์ที่แก้ | แก้อะไร | สถานะ |
@@ -809,6 +820,8 @@ opencode-go levels ไม่เปลี่ยน) — เทส URL แดง�
 Claude non-stream ได้ `type:"message"` ทั้งข้อความ (`end_turn`) และ `tool_use:Bash`; OpenAI non-stream ได้ `chat.completion` มีข้อความ;
 Claude stream + tool ได้ SSE ครบ `message_start`→`message_stop` พร้อม `tool_use` Bash; `usageHistory` บันทึก `muse … ok` cost > 0 ทุกแถว;
 request log ยืนยัน wire = `https://api.meta.ai/v1/responses`, `reasoning: {effort: "max", summary: "auto"}`, ไม่มี `reasoning_effort`
+
+**Push (2026-10-02):** `origin/master` (`gftdon/9router`) `d3053f85..2b5bcbac` — 8 commits (LP-017..LP-020 + test `dc84b0ab` + docs) push ปกติ ไม่ force
 
 ---
 

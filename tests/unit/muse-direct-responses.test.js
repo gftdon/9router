@@ -69,3 +69,19 @@ describe("muse direct provider wire routing", () => {
     expect(wire.body).toHaveProperty("input");
   });
 });
+
+describe("muse direct provider reasoning effort", () => {
+  // Meta's /v1/responses: HTTP 400 "unknown parameter `reasoning_effort`". (LP-018)
+  it("moves a Claude client's effort into reasoning.effort", async () => {
+    const wire = await captureWire({ endpoint: "/v1/messages", body: claudeBody(`${MODEL}(high)`), model: `${MODEL}(high)` });
+    expect(wire.body).not.toHaveProperty("reasoning_effort");
+    expect(wire.body.reasoning).toMatchObject({ effort: "high", summary: "auto" });
+  });
+
+  it("moves an OpenAI client's reasoning_effort into reasoning.effort", async () => {
+    const body = { ...openaiBody(), reasoning_effort: "low" };
+    const wire = await captureWire({ endpoint: "/v1/chat/completions", body });
+    expect(wire.body).not.toHaveProperty("reasoning_effort");
+    expect(wire.body.reasoning).toMatchObject({ effort: "low" });
+  });
+});

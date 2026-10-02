@@ -92,9 +92,21 @@ function openAICompletionToResponses(responseBody, customToolNames = null) {
 }
 
 /**
- * Translate non-streaming response body from provider format → OpenAI format.
+ * Translate non-streaming response body from provider format → client format.
+ *
+ * LP-024: the per-target branches below only reach OpenAI Chat Completions;
+ * a Claude (/v1/messages) or Responses client behind a Gemini/Antigravity,
+ * Claude or Ollama target got that chat.completion verbatim. Finish the hop.
  */
 export function translateNonStreamingResponse(responseBody, targetFormat, sourceFormat, customToolNames = null) {
+  const translated = translateProviderBodyToOpenAI(responseBody, targetFormat, sourceFormat, customToolNames);
+  if (targetFormat === sourceFormat || targetFormat === FORMATS.OPENAI || !translated?.choices) return translated;
+  if (sourceFormat === FORMATS.CLAUDE) return openAICompletionToClaudeMessage(translated);
+  if (sourceFormat === FORMATS.OPENAI_RESPONSES) return openAICompletionToResponses(translated, customToolNames);
+  return translated;
+}
+
+function translateProviderBodyToOpenAI(responseBody, targetFormat, sourceFormat, customToolNames = null) {
   if (targetFormat === sourceFormat) return responseBody;
   // Provider responded in OpenAI Chat Completions shape but the client speaks
   // Responses API — convert so tool_calls/text surface as Responses `output`.

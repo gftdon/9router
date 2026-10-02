@@ -552,6 +552,15 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     return nonStream;
   }
 
+  // LP-030: a Responses upstream that always streams (opencode-go pins stream:true)
+  // answers SSE to a non-stream client; the chat SSE parser in the non-stream
+  // handler cannot read Responses events and returned an empty chat.completion.
+  const upstreamIsSSE = (providerResponse.headers.get("content-type") || "").includes("text/event-stream");
+  if (!stream && upstreamIsSSE && providerResponseFormat === FORMATS.OPENAI_RESPONSES) {
+    const result = await handleForcedSSEToJson({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, customToolNames, toolNameMap, trackDone, appendLog });
+    if (result) { streamController.handleComplete(); return result; }
+  }
+
   // True non-streaming response
   if (!stream) {
     const result = await handleNonStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, reqLogger, toolNameMap, customToolNames, trackDone, appendLog });

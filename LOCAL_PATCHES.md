@@ -13,7 +13,7 @@
 | Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`) — **ไม่ได้**รันจาก LaunchAgent / terminal |
 | Request logs | เปิดอยู่ → `~/.local/lib/node_modules/9router/app/logs/` เก็บ `x-api-key` แบบ plaintext — ปิดและลบเมื่อดีบักเสร็จ |
 | ค้างตรวจ | Bug A (gemini `reason`), Bug D (antigravity non-stream), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh |
-| LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 (`5c96c99e`, ยังไม่ deploy) |
+| LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
 
@@ -43,7 +43,7 @@
 | `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE |
 | `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | ACTIVE |
 | `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy + ยืนยัน live แล้ว; ไม่ครอบคลุม signature ของ kimi → LP-022) |
-| `5c96c99e` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (ยังไม่ deploy) |
+| `5c96c99e`, `4e8d2f28` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (`5c96c99e` deploy + ยืนยันแล้ว; `4e8d2f28` ยังไม่ deploy) |
 | — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -881,7 +881,7 @@ turn ที่ว่างหลังทิ้งจะถูกขั้นถ
 
 ## LP-022: thinking ที่มี signature ของโมเดลอื่น (ไม่ว่าง) ทำให้ Claude 400 — retry โดยตัด thinking
 
-**Status:** ACTIVE (commit แล้ว ยังไม่ deploy) · **Commit:** `5c96c99e` · **Implemented:** 2026-10-03 · **เดิม:** Bug E · **ต่อยอด:** LP-003, LP-021
+**Status:** ACTIVE · **Commits:** `5c96c99e` (deploy + ยืนยัน live 2026-10-03), `4e8d2f28` (ปรับเงื่อนไขปิด thinking — ยังไม่ deploy) · **Implemented:** 2026-10-03 · **เดิม:** Bug E · **ต่อยอด:** LP-003, LP-021
 
 **อาการ:** combo ชื่อเดิม (เช่น `9-orchestrator` = claude → kimi → …) fallback ไป kimi; kimi ส่ง thinking พร้อม signature ของตัวเอง (ไม่ว่าง) Claude Code เก็บไว้
 → เทิร์นต่อมากลับไป Claude → 400 `Invalid \`signature\` in \`thinking\` block` (replay variant C ใน LP-021) LP-021 ทิ้งได้แค่ signature ว่าง
@@ -889,14 +889,18 @@ turn ที่ว่างหลังทิ้งจะถูกขั้นถ
 
 **วิธีแก้ (ทางเลือก 1 ที่ผู้ใช้เลือก):** ใน `chatCore.js` ถ้า target เป็น Claude และได้ 400 ที่ข้อความตรง `Invalid \`signature\` in \`thinking\` block` เท่านั้น
 → `stripThinkingForSignatureRetry` (`claude.js`) ตัด thinking/redacted_thinking ทุกอันออกจาก assistant turn แล้ว `executor.execute` ซ้ำ **1 ครั้ง**
-- ถ้า assistant turn **ล่าสุด** เสีย thinking ไป (tool loop ปัจจุบัน) → ปิด `thinking` สำหรับ retry นั้น และเอา `context_management.edits` ชนิด `clear_thinking*` ออกด้วย
+- ถ้า assistant turn **ล่าสุด** เสีย thinking ไป **และจบด้วย `tool_use` (tool loop ที่ยังเปิดอยู่)** → ปิด `thinking` สำหรับ retry นั้น
+  (`4e8d2f28`: เดิม `5c96c99e` ปิดทุกครั้งที่ turn ล่าสุดเสีย thinking แม้จบด้วยข้อความ — เห็นจาก request log ตอนยืนยัน live ว่าปิดโดยไม่จำเป็น) และเอา `context_management.edits` ชนิด `clear_thinking*` ออกด้วย
   (API บังคับให้ turn นั้นขึ้นต้นด้วย thinking ถ้าเปิด thinking; clear_thinking ใช้ไม่ได้ถ้าปิด thinking) — ราคาที่จ่าย: เทิร์นนั้นตอบโดยไม่มี extended thinking
 - 400 อื่นไม่ retry; retry ล้มก็คืน error เดิมตามปกติ
 - เทส source-scan ของ upstream `opencode-go-session` (`executor.execute({...})` ต้องมี 2 จุด) ปรับเป็น 3 — เจตนาเดิมคือทุก call ต้องส่ง `providerSessionId: sessionSeed` + `clientTool` ซึ่ง call ใหม่ส่งครบ
 
 **Validation (2026-10-03):** `claude-native-thinking` 15/15 (+3: retry ตัด thinking, tool loop ปิด thinking + ตัด clear_thinking, 400 อื่นไม่ retry) — 2 เทส retry แดงเมื่อไม่มี fix;
 `opencode-go-session`, `claude-foreign-server-tool-use` ผ่าน; full suite 106 failed เท่าก่อนแก้ทุก assertion (หลังปรับเทส source-scan); eslint ผ่าน
-**ยังไม่ได้:** build/deploy และ replay variant C กับ Anthropic จริง (ต้องได้ 200 หลัง deploy)
+**Install + live (2026-10-03 00:2x):** สำรองที่ `/tmp/9router-before-lp022-20261003/` (ไม่รวม logs) → ติดตั้ง build `5c96c99e` → ปิด launcher/server → ลบ request logs
+→ ผู้ใช้เปิดใหม่ที่ ttys006 (`ENABLE_REQUEST_LOGS=true`) → replay request จริงของ Claude Code (`/tmp/lp021-cc`): **A 200, B 200, C 200** (ตอบ "400", `message_stop`)
+C: request log `4_req_target.json` = assistant `text` ไม่มี thinking (retry ทำงาน) แต่ `thinking` ถูกปิดทั้งที่ turn ล่าสุดจบด้วยข้อความ → แก้ใน `4e8d2f28`
+(full suite 106 เท่าเดิม; เทสเพิ่ม assertion ว่า turn ข้อความยังเปิด thinking + คง `clear_thinking`) — `4e8d2f28` ยังไม่ได้ build/deploy
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** เทียบกับวิธีที่ upstream จัดการ signature ต่างโมเดล; ถ้า upstream เพิ่ม `executor.execute` จุดใหม่ เทส source-scan จะต้องนับใหม่
 

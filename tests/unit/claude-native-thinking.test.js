@@ -113,4 +113,33 @@ describe("Claude Code native combo thinking round-trip", () => {
     }, []);
     expect(body.messages[1].content.map(b => b.type)).toEqual(["tool_use"]);
   });
+
+  // LP-021: a combo turn served by a non-Claude model comes back with
+  // signature "" — Anthropic 400s "Invalid `signature` in `thinking` block".
+  it("drops thinking blocks that carry no signature, keeps opaque ones", async () => {
+    const blocks = [
+      { type: "thinking", thinking: "from kimi", signature: "" },
+      { type: "thinking", thinking: "no field" },
+      { type: "redacted_thinking", data: "" },
+      ...nativeThinking(),
+    ];
+    const body = await dispatchNativeCombo("claude-opus-5-5(medium)", {
+      type: "enabled", budget_tokens: 2048,
+    }, blocks);
+    expect(body.messages[1].content.filter(isThinking)).toEqual(nativeThinking());
+    expect(body.messages[1].content.at(-1).type).toBe("tool_use");
+  });
+
+  it("drops a turn left empty, like a stripped foreign server_tool_use", async () => {
+    const { normalizeClaudePassthrough } = await import("../../open-sse/translator/formats/claude.js");
+    const out = normalizeClaudePassthrough({
+      model: "claude-opus-5-5", max_tokens: 1024,
+      messages: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: [{ type: "thinking", thinking: "x", signature: "" }] },
+        { role: "user", content: "again" },
+      ],
+    }, "claude-opus-5-5");
+    expect(out.messages.map((m) => m.role)).toEqual(["user", "user"]);
+  });
 });

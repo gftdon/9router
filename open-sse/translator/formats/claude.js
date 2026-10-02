@@ -205,6 +205,14 @@ function hasForeignServerToolUseId(block) {
     && !CLAUDE_SERVER_TOOL_USE_ID.test(String(block.id ?? ""));
 }
 
+// Only the "no signature at all" case — any non-empty signature stays opaque
+// (LP-003: prefix heuristics wrongly rejected newer Claude signatures).
+function isUnsignedThinking(block) {
+  if (block?.type === CLAUDE_BLOCK.THINKING) return typeof block.signature !== "string" || block.signature === "";
+  if (block?.type === CLAUDE_BLOCK.REDACTED_THINKING) return typeof block.data !== "string" || block.data === "";
+  return false;
+}
+
 // Normalize a native Claude passthrough body to match Anthropic Messages API spec.
 // Newer Cowork/Claude Code clients emit beta-only shapes that OAuth endpoints reject:
 // 1. thinking.type "adaptive" → unsupported on Haiku
@@ -274,7 +282,10 @@ export function normalizeClaudePassthrough(body, model = "") {
   // Signatures and redacted data are opaque; prefix heuristics reject newer
   // Claude signatures (e.g. CAIS...) and must not replace them with a placeholder.
   // Leave authenticity validation to Anthropic, including mixed-provider history.
-  // Only remove foreign server-tool ids and their paired results here.
+  // Only remove foreign server-tool ids and their paired results here — plus
+  // thinking blocks with no signature at all (LP-021): a combo turn served by a
+  // non-Claude model comes back with signature "", which can never be Claude's
+  // and makes Anthropic 400 "Invalid `signature` in `thinking` block".
   const droppedServerToolUseIds = new Set();
   if (Array.isArray(body.messages)) {
     for (const msg of body.messages) {
@@ -285,6 +296,7 @@ export function normalizeClaudePassthrough(body, model = "") {
           if (block.id != null) droppedServerToolUseIds.add(String(block.id));
           continue;
         }
+        if (isUnsignedThinking(block)) continue;
         kept.push(block);
       }
       msg.content = kept;

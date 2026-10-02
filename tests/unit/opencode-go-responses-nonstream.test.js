@@ -64,3 +64,45 @@ describe("opencode-go Responses-only models, non-stream clients (LP-030)", () =>
     expect(json.choices[0].message.content).toBe("7006652");
   });
 });
+
+// LP-031: OpenCode Go answers HTTP 200 and then `event: error` (Azure token rate
+// limit). That came back as an empty `in_progress` 200; it must be an error so the
+// combo/account loop can fall back.
+describe("in-stream upstream errors, non-stream clients (LP-031)", () => {
+  const created = `event: response.created\ndata: ${JSON.stringify({ type: "response.created", response: { id: "resp_e1", created_at: 1700000000, model: MODEL } })}`;
+  const sse = (...events) => [created, ...events, ""].join("\n\n");
+  const call = async (endpoint, body) => {
+    const { handleChatCore } = await import("../../open-sse/handlers/chatCore.js");
+    return handleChatCore({
+      body: structuredClone(body),
+      modelInfo: { provider: "opencode-go", model: MODEL },
+      credentials: { apiKey: "test-key", providerSpecificData: {} },
+      clientRawRequest: { endpoint, body, headers: { accept: "application/json" } },
+      sourceFormatOverride: { "/v1/messages": "claude", "/v1/responses": "openai-responses" }[endpoint],
+      connectionId: "test-connection",
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+  };
+  const respond = (text) => fetchMock.mockImplementation(async () => new Response(text, { status: 200, headers: { "content-type": "text/event-stream" } }));
+
+  it("maps a rate-limit `error` event to 429 for every client format", async () => {
+    respond(sse(`event: error\ndata: ${JSON.stringify({ type: "too_many_requests", code: "rate_limit_exceeded", message: "exceeded token rate limit" })}`));
+    for (const [endpoint, body] of [
+      ["/v1/responses", { model: MODEL, input: "hi", stream: false }],
+      ["/v1/messages", { model: MODEL, max_tokens: 50, stream: false, messages: [{ role: "user", content: "hi" }] }],
+      ["/v1/chat/completions", { model: MODEL, stream: false, messages: [{ role: "user", content: "hi" }] }],
+    ]) {
+      const result = await call(endpoint, body);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe(429);
+      expect(result.error).toContain("exceeded token rate limit");
+    }
+  });
+
+  it("maps response.failed with an error to 502", async () => {
+    respond(sse(`event: response.failed\ndata: ${JSON.stringify({ type: "response.failed", response: { id: "resp_e1", status: "failed", error: { code: "server_error", message: "boom" } } })}`));
+    const result = await call("/v1/responses", { model: MODEL, input: "hi", stream: false });
+    expect(result.success).toBe(false);
+    expect(result.status).toBe(502);
+  });
+});

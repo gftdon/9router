@@ -36,6 +36,12 @@ function processSSEMessage(msg, state) {
     }
   } else if (eventType === "response.failed") {
     state.status = "failed";
+    if (parsed.response?.error) state.error = parsed.response.error;
+  } else if (eventType === "error") {
+    // LP-031: an upstream error after HTTP 200 (e.g. OpenCode Go / Azure
+    // `rate_limit_exceeded`) — keep it so the caller can fail the request.
+    state.status = "failed";
+    state.error = parsed.error && typeof parsed.error === "object" ? parsed.error : parsed;
   }
 }
 
@@ -98,6 +104,7 @@ export async function convertResponsesStreamToJson(stream) {
     created_at: state.created,
     status: state.status || "completed",
     output,
-    usage: state.usage
+    usage: state.usage,
+    ...(state.error ? { error: state.error } : {})
   };
 }

@@ -177,6 +177,15 @@ export function parseSSEToOpenAIResponse(rawSSE, fallbackModel) {
   return result;
 }
 
+function responsesStreamErrorStatus(error) {
+  const message = (typeof error?.message === "string" && error.message) || "Upstream stream failed";
+  const explicit = Number(error?.status);
+  if (Number.isInteger(explicit) && explicit >= 400 && explicit <= 599) return { status: explicit, message };
+  const kind = `${error?.code || ""} ${error?.type || ""}`.toLowerCase();
+  const status = /rate_limit|too_many_requests/.test(kind) ? HTTP_STATUS.RATE_LIMITED : HTTP_STATUS.BAD_GATEWAY;
+  return { status, message };
+}
+
 /**
  * Handle case: provider forced streaming but client wants JSON.
  * Supports both Codex/Responses API SSE and standard Chat Completions SSE.
@@ -202,6 +211,15 @@ export async function handleForcedSSEToJson({ providerResponse, sourceFormat, ta
   if (isCodexResponsesApi) {
     try {
       const jsonResponse = await convertResponsesStreamToJson(providerResponse.body);
+      // LP-031: the stream failed after HTTP 200 — return an error (429 for rate
+      // limits) so the account/combo loop can fall back instead of handing the
+      // client an empty in_progress response.
+      if (jsonResponse.status === "failed" && jsonResponse.error) {
+        const { status, message } = responsesStreamErrorStatus(jsonResponse.error);
+        appendLog({ status: `FAILED ${status}` });
+        if (log?.errorLine) log.errorLine(reqTag, "✗", `ERROR ${status} · ${provider}/${model} · in-stream: ${message}`);
+        return createErrorResult(status, message);
+      }
       if (onRequestSuccess) await onRequestSuccess();
 
       const usage = jsonResponse.usage || {};

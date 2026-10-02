@@ -29,6 +29,7 @@
 | `f2d5bba4` | `open-sse/executors/muse.js`, `open-sse/executors/index.js` | LP-018: MuseExecutor ย้าย `reasoning_effort` → `reasoning.effort` บน /v1/responses | ACTIVE |
 | `d0da91c0` | `open-sse/executors/muse.js` | LP-013 (ขยาย): จำกัดความลึก tool schema ให้ provider `muse` ตรงด้วย | ACTIVE |
 | `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE |
+| `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | ACTIVE |
 | — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -750,16 +751,16 @@ chat SSE tool call→tool_use); เทสที่เกี่ยวข้อง
 - รัน `npx vitest run unit/claude-forced-sse-nonstream.test.js` ทุกครั้ง
 - ยังไม่ได้แก้ (นอก scope): `antigravity` ตอบ SSE กลับมาแม้ client ส่ง `stream:false`
 
-## LP-017 / LP-018 / LP-019: combo `9-fast-worker` ใช้ `muse/muse-spark-1.3-contributor(max)` แล้ว HTTP 400 (provider `muse` ตรงของ Meta)
+## LP-017 / LP-018 / LP-019 / LP-020: combo `9-fast-worker` ใช้ `muse/muse-spark-1.3-contributor(max)` แล้ว HTTP 400 (provider `muse` ตรงของ Meta)
 
-**Status:** ACTIVE · **Commits:** `010d2460` (LP-017), `f2d5bba4` (LP-018), `d0da91c0` (LP-013 ขยาย), `db547565` (LP-019) · **Implemented:** 2026-10-02
+**Status:** ACTIVE · **Commits:** `010d2460` (LP-017), `f2d5bba4` (LP-018), `d0da91c0` (LP-013 ขยาย), `db547565` (LP-019), `b528c903` (LP-020), test `dc84b0ab` · **Implemented:** 2026-10-02
 **Upstream:** provider `muse` เพิ่งมาใน v0.5.95 (`28809807`); `upstream/master` = v0.5.95 ไม่มี commit แก้, ไม่มี issue ที่ตรง → CASE A
 
 **อาการ:** ใส่ `muse/muse-spark-1.3-contributor(max)` เป็นตัวแรกของ `9-fast-worker` แล้วทุก request ได้
 `[400] unknown parameter 'input'` แล้ว combo ตกไป `ag/gemini-3.8-flash-high` เงียบๆ (request ที่ fail ไม่ถูกบันทึกใน `usageHistory`)
 เป็นทุก effort (none/low/high/xhigh/max) และทั้ง client แบบ Claude และ OpenAI — ใช้ได้เฉพาะ client แบบ Responses ที่ไม่ใส่ effort
 
-**Root cause — 4 ชั้นซ้อนกัน (แยก commit ตามสาเหตุ):**
+**Root cause — 5 ชั้นซ้อนกัน (แยก commit ตามสาเหตุ):**
 1. **LP-017 (URL ผิด):** model ของ muse ประกาศ `supportedFormats: ["openai-responses"]` client Claude/OpenAI จึงไม่ได้ใช้ transport ตาม sourceFormat
    (`useTransport = null`) `chatCore.js` แปลง body เป็น Responses ตาม `modelTargetFormat` แต่ไม่ได้เลือก transport ตาม format นั้น →
    executor ใช้ `baseUrl` default = `/v1/chat/completions` → body `input` ไปลงผิด endpoint
@@ -775,11 +776,19 @@ chat SSE tool call→tool_use); เทสที่เกี่ยวข้อง
    และอาจส่ง `none` ซึ่ง Meta ปฏิเสธ (`Supported values: [minimal, low, medium, high, xhigh, max]` — probe ตรง 2026-10-02)
    **แก้:** เพิ่ม `{ provider: "muse", pattern: "muse-spark*", levels: [minimal…max] }` จำกัดเฉพาะ `muse`
    ⚠️ **opencode-go ไม่ได้แก้:** `ocg/…(max)` ยังถูก clamp เป็น `xhigh` เหมือนเดิม (ยังไม่ได้ทดสอบว่า opencode ส่ง `max` ผ่านไปได้)
+5. **LP-020 (non-stream ได้คำตอบว่าง):** พบหลัง deploy รอบแรกจาก request log — translator Responses ใส่ `stream: true` เสมอ
+   (`openaiToOpenAIResponsesRequest`) Meta จึงตอบ SSE แม้ client ส่ง `stream:false`; muse ไม่ได้ประกาศ `forceStream` → `handleNonStreamingResponse`
+   ส่ง SSE ให้ `parseSSEToOpenAIResponse` (parser ของ chat) ซึ่งไม่รู้จัก event ของ Responses → `chat.completion` ที่ `content: ""`
+   และไม่แปลงเป็น Anthropic message ให้ client Claude **แก้:** `forceStream: true` ใน `transport` ของ muse เหมือน codex/grok-cli →
+   ใช้ `handleForcedSSEToJson` (มี LP-016 แปลงเป็น `message` ให้ client Claude อยู่แล้ว)
+   ⚠️ provider-level: ถ้ามี passthrough model ที่ไปทาง `/chat/completions` ก็จะถูก force stream ด้วย (handleForcedSSEToJson รองรับ chat SSE)
 
-**Validation (2026-10-02):** `tests/unit/muse-direct-responses.test.js` 8/8 (URL ทั้ง client Claude/OpenAI, effort field, schema depth, levels + `(max)` → `max`,
+**Validation (2026-10-02):** `tests/unit/muse-direct-responses.test.js` 10/10 (รวม non-stream ของ LP-020; ตอนแรก 8/8) (URL ทั้ง client Claude/OpenAI, effort field, schema depth, levels + `(max)` → `max`,
 opencode-go levels ไม่เปลี่ยน) — เทส URL แดงเมื่อไม่มี LP-017; เทส routing ที่เกี่ยวข้อง (minimax, opencode-go/zen, xiaomi-mimo) ผ่าน
 (`force-stream-config` แดง 2 = ของเดิมตั้งแต่ v0.5.95); full suite 106 failed **เท่าเดิมทุก assertion** เทียบ merge v0.5.95; eslint ผ่าน
-**ยืนยันกับ Meta จริง (ยังไม่ deploy):** ให้โค้ดที่แก้สร้าง wire body จาก request แบบ Claude Code (`(max)`, stream, tool `Bash` + tool ซ้อน 13 ชั้น)
+**หมายเหตุเทส:** fixture แบบ Claude ที่เป็น string content ก็เป็น OpenAI ที่ถูกต้องด้วย detectFormat จึงเดาเป็น openai — ต้องส่ง `sourceFormatOverride: "claude"`
+แบบที่ route `/v1/messages` จริงทำ (`dc84b0ab`) มิฉะนั้นเทสจะผ่านโดยไม่ได้ทดสอบเส้น Claude จริง
+**ยืนยันกับ Meta จริง (ก่อน deploy):** ให้โค้ดที่แก้สร้าง wire body จาก request แบบ Claude Code (`(max)`, stream, tool `Bash` + tool ซ้อน 13 ชั้น)
 แล้วยิงตรง `https://api.meta.ai/v1/responses` ด้วย token ของ connection → **HTTP 200**, `effort: "max"`, เรียก tool `Bash`, จบ `response.completed`
 
 **⚠️ เช็คตอน upgrade รอบหน้า:**
@@ -787,6 +796,19 @@ opencode-go levels ไม่เปลี่ยน) — เทส URL แดง�
 - ถ้า upstream เพิ่ม executor ของ `muse` เอง → รวม LP-018/LP-013 เข้ากับของ upstream ห้ามมี 2 ตัว
 - ถ้า upstream เพิ่ม levels ของ muse-spark → LP-019 เทียบกับค่าที่ Meta รับจริงก่อนทิ้ง
 - รัน `npx vitest run unit/muse-direct-responses.test.js` เป็น gate
+- ถ้า upstream ประกาศ `forceStream` ให้ muse หรือทำให้ non-stream path อ่าน Responses SSE ได้ → LP-020 = UPSTREAM_FIXED
+
+**Install (2026-10-02):** สำรอง global + SQLite ที่ `/tmp/9router-before-lp017-20261002/` (0700/0600) → `npm run cli:pack` → `npm install --global ./9router-0.5.95.tgz`
+→ ปิด launcher ก่อนแล้วค่อยปิด server (รอบก่อนๆ ที่ "terminal เปิดซ้ำเอง" เกิดจากปิด server ลูกก่อน แล้ว `tryRestart` ของ launcher ปลุกตัวใหม่)
+→ เปิดใหม่ตามที่ผู้ใช้สั่ง `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, log ไป `/tmp/9router.log`) — deploy 2 รอบ
+(รอบแรก LP-017..LP-019 เจอ LP-020 จาก request log, รอบสอง +LP-020) listener 54426 / launcher 54323 `/api/health` = `{"ok":true}`
+⚠️ ตัวนี้**ไม่ได้**รันจาก LaunchAgent; request log อยู่ที่ `~/.local/lib/node_modules/9router/app/logs/` (หายเมื่อ reinstall) และ
+`1_req_client.json` เก็บ header ของ client ทั้งหมดรวม `x-api-key` / `x-9r-peer-token` แบบ plaintext — ปิด `ENABLE_REQUEST_LOGS` เมื่อดีบักเสร็จ แล้วลบโฟลเดอร์ logs
+
+**Live probe หลัง deploy (ผ่าน 9Router จริง):** `muse/muse-spark-1.3-contributor(max)` และ combo `9-fast-worker` (→ muse ตัวแรก) —
+Claude non-stream ได้ `type:"message"` ทั้งข้อความ (`end_turn`) และ `tool_use:Bash`; OpenAI non-stream ได้ `chat.completion` มีข้อความ;
+Claude stream + tool ได้ SSE ครบ `message_start`→`message_stop` พร้อม `tool_use` Bash; `usageHistory` บันทึก `muse … ok` cost > 0 ทุกแถว;
+request log ยืนยัน wire = `https://api.meta.ai/v1/responses`, `reasoning: {effort: "max", summary: "auto"}`, ไม่มี `reasoning_effort`
 
 ---
 

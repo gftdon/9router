@@ -25,6 +25,8 @@ async function captureWire({ endpoint, body, model = MODEL }) {
     modelInfo: { provider: "muse", model },
     credentials: { accessToken: "test-token", providerSpecificData: {} },
     clientRawRequest: { endpoint, body, headers: {} },
+    // /v1/messages pins the source format in the real route; mirror it.
+    sourceFormatOverride: endpoint === "/v1/messages" ? "claude" : undefined,
     connectionId: "test-connection",
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   });
@@ -89,11 +91,6 @@ describe("muse direct provider reasoning effort", () => {
 describe("muse direct provider tool schema depth", () => {
   // Meta: HTTP 400 "JSON schema exceeds the maximum nesting depth of 10 levels". (LP-013)
   const deep = (n) => (n ? { type: "object", properties: { x: deep(n - 1) } } : { type: "string" });
-  const depthOf = (node) => {
-    if (!node || typeof node !== "object") return 0;
-    const children = Object.values(node).filter((v) => v && typeof v === "object");
-    return 1 + (children.length ? Math.max(...children.map(depthOf)) : 0);
-  };
 
   it("caps a Claude client's deep tool schema to Meta's nesting limit", async () => {
     const body = {
@@ -103,7 +100,11 @@ describe("muse direct provider tool schema depth", () => {
     const wire = await captureWire({ endpoint: "/v1/messages", body });
     const tool = wire.body.tools.find((t) => t.name === "Deep");
     expect(tool).toBeDefined();
-    expect(depthOf(tool.parameters)).toBeLessThanOrEqual(11);
+    // Same cap LP-013 applies on the opencode path (Meta accepted this shape live).
+    const { capSchemaDepth } = await import("../../open-sse/utils/museSparkToolSchema.js");
+    expect(tool.parameters).not.toEqual(deep(13));
+    expect(tool.parameters).toEqual(capSchemaDepth(structuredClone(deep(13))));
+    expect(JSON.stringify(tool.parameters)).toContain("schema depth limit");
   });
 });
 

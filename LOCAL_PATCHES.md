@@ -20,11 +20,15 @@
 | `d09abdcb` | `src/lib/db/repos/usageRepo.js` | LP-010: warn เมื่อไม่มี pricing entry (เลิกเงียบ) | ACTIVE / KEPT (v0.5.95) |
 | `594fcba0` | `tests/vitest.config.js` | LP-011: บังคับ DATA_DIR แยกตอนรันเทส (กัน DB จริงโดนเขียน) | ACTIVE / KEPT (v0.5.95) |
 | `cc176d22` | `scripts/backfill-usage-cost.mjs`, `src/lib/db/helpers/dateKey.js` | LP-012: สคริปต์ backfill ยอด cost ย้อนหลัง | ACTIVE / KEPT (v0.5.95) |
-| `ba910b94` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/opencode{,-go,-zen}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE / KEPT (v0.5.95) |
+| `ba910b94`, `d0da91c0` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/{opencode,opencode-go,opencode-zen,muse}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE / KEPT (v0.5.95) |
 | `7fd7ee12`, `d48c12c8` | `open-sse/providers/registry/codex.js`, `open-sse/providers/pricing.js` | LP-014: bump Codex CLI identity → 0.159.0 + เพิ่ม gpt-6.1-sol | UPSTREAM_FIXED (`ca6e8407`, `dec820b9`, v0.5.95) |
 | `c85dc41e` | `open-sse/config/grokCli.js` (+7 ไฟล์) | LP-015: backport upstream `6b9dc54d` — Grok CLI identity 0.2.99 → 1.0.44 (แก้ HTTP 426) | UPSTREAM_FIXED (`6b9dc54d` อยู่ใน v0.5.95 แล้ว) |
 | `8f7c6cde` | `open-sse/handlers/chatCore/{sseToJsonHandler,nonStreamingHandler,claudeMessageBody}.js` | LP-016 (เดิม Bug C): `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน Anthropic `message` แทน chat.completion | ACTIVE / KEPT (v0.5.95) |
 
+| `010d2460` | `open-sse/handlers/chatCore.js` | LP-017: เลือก transport ตาม targetFormat ของ model เมื่อไม่มี transport ตรงกับ client (muse ยิงผิด URL → 400 `unknown parameter input`) | ACTIVE |
+| `f2d5bba4` | `open-sse/executors/muse.js`, `open-sse/executors/index.js` | LP-018: MuseExecutor ย้าย `reasoning_effort` → `reasoning.effort` บน /v1/responses | ACTIVE |
+| `d0da91c0` | `open-sse/executors/muse.js` | LP-013 (ขยาย): จำกัดความลึก tool schema ให้ provider `muse` ตรงด้วย | ACTIVE |
+| `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE |
 | — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -745,6 +749,44 @@ chat SSE tool call→tool_use); เทสที่เกี่ยวข้อง
 - ถ้า upstream ย้าย/แก้ `openAICompletionToClaudeMessage` ใน `nonStreamingHandler.js` ให้ resolve โดยคง helper ไว้ที่เดียว (ไม่ duplicate)
 - รัน `npx vitest run unit/claude-forced-sse-nonstream.test.js` ทุกครั้ง
 - ยังไม่ได้แก้ (นอก scope): `antigravity` ตอบ SSE กลับมาแม้ client ส่ง `stream:false`
+
+## LP-017 / LP-018 / LP-019: combo `9-fast-worker` ใช้ `muse/muse-spark-1.3-contributor(max)` แล้ว HTTP 400 (provider `muse` ตรงของ Meta)
+
+**Status:** ACTIVE · **Commits:** `010d2460` (LP-017), `f2d5bba4` (LP-018), `d0da91c0` (LP-013 ขยาย), `db547565` (LP-019) · **Implemented:** 2026-10-02
+**Upstream:** provider `muse` เพิ่งมาใน v0.5.95 (`28809807`); `upstream/master` = v0.5.95 ไม่มี commit แก้, ไม่มี issue ที่ตรง → CASE A
+
+**อาการ:** ใส่ `muse/muse-spark-1.3-contributor(max)` เป็นตัวแรกของ `9-fast-worker` แล้วทุก request ได้
+`[400] unknown parameter 'input'` แล้ว combo ตกไป `ag/gemini-3.8-flash-high` เงียบๆ (request ที่ fail ไม่ถูกบันทึกใน `usageHistory`)
+เป็นทุก effort (none/low/high/xhigh/max) และทั้ง client แบบ Claude และ OpenAI — ใช้ได้เฉพาะ client แบบ Responses ที่ไม่ใส่ effort
+
+**Root cause — 4 ชั้นซ้อนกัน (แยก commit ตามสาเหตุ):**
+1. **LP-017 (URL ผิด):** model ของ muse ประกาศ `supportedFormats: ["openai-responses"]` client Claude/OpenAI จึงไม่ได้ใช้ transport ตาม sourceFormat
+   (`useTransport = null`) `chatCore.js` แปลง body เป็น Responses ตาม `modelTargetFormat` แต่ไม่ได้เลือก transport ตาม format นั้น →
+   executor ใช้ `baseUrl` default = `/v1/chat/completions` → body `input` ไปลงผิด endpoint
+   **แก้:** ถ้า `targetFormat !== defaultFormat` ให้ใช้ `resolveTransport(provider, targetFormat)` กรณี format ตรงกับ default เดิม (ocg kimi/glm, MiniMax) ไม่เปลี่ยน
+   — จงใจจำกัดแค่นี้เพราะ executor ใช้ `rt.headers` แทน `config.headers` เมื่อมี runtimeTransport
+2. **LP-018 (ฟิลด์ effort ผิด):** pipeline ใส่ `reasoning_effort` top-level เสมอ (แม้ client ส่ง `reasoning.effort` มาถูก) แต่ Meta /v1/responses
+   ตอบ `unknown parameter 'reasoning_effort'` — opencode-go/zen มี normalization นี้ให้ Muse อยู่แล้ว แต่ `muse` ใช้ DefaultExecutor
+   **แก้:** `open-sse/executors/muse.js` (`MuseExecutor`) ย้ายเป็น `reasoning: { effort, summary: "auto" }` เฉพาะ body ที่มี `input` (Responses) ลงทะเบียนใน `executors/index.js`
+   (`hasSpecializedExecutor` ไม่มี caller ใน repo — ไม่มีผลข้างเคียง)
+3. **LP-013 ขยาย (schema ลึก):** หลังแก้ 1+2 ยิงตรง Meta ยังได้ `JSON schema exceeds the maximum nesting depth of 10 levels` เมื่อมี tool ซ้อนลึก
+   เพราะ cap ของ LP-013 อยู่แค่ใน executor ของ opencode **แก้:** เรียก `capToolSchemasDepth` เดิมใน `MuseExecutor`
+4. **LP-019 (max ถูกตัดเป็น xhigh):** muse-spark ไม่มี entry ใน `thinkingLevels.js` จึงได้ชุด openai (`none…xhigh`) → `(max)` ถูก clamp เป็น `xhigh`
+   และอาจส่ง `none` ซึ่ง Meta ปฏิเสธ (`Supported values: [minimal, low, medium, high, xhigh, max]` — probe ตรง 2026-10-02)
+   **แก้:** เพิ่ม `{ provider: "muse", pattern: "muse-spark*", levels: [minimal…max] }` จำกัดเฉพาะ `muse`
+   ⚠️ **opencode-go ไม่ได้แก้:** `ocg/…(max)` ยังถูก clamp เป็น `xhigh` เหมือนเดิม (ยังไม่ได้ทดสอบว่า opencode ส่ง `max` ผ่านไปได้)
+
+**Validation (2026-10-02):** `tests/unit/muse-direct-responses.test.js` 8/8 (URL ทั้ง client Claude/OpenAI, effort field, schema depth, levels + `(max)` → `max`,
+opencode-go levels ไม่เปลี่ยน) — เทส URL แดงเมื่อไม่มี LP-017; เทส routing ที่เกี่ยวข้อง (minimax, opencode-go/zen, xiaomi-mimo) ผ่าน
+(`force-stream-config` แดง 2 = ของเดิมตั้งแต่ v0.5.95); full suite 106 failed **เท่าเดิมทุก assertion** เทียบ merge v0.5.95; eslint ผ่าน
+**ยืนยันกับ Meta จริง (ยังไม่ deploy):** ให้โค้ดที่แก้สร้าง wire body จาก request แบบ Claude Code (`(max)`, stream, tool `Bash` + tool ซ้อน 13 ชั้น)
+แล้วยิงตรง `https://api.meta.ai/v1/responses` ด้วย token ของ connection → **HTTP 200**, `effort: "max"`, เรียก tool `Bash`, จบ `response.completed`
+
+**⚠️ เช็คตอน upgrade รอบหน้า:**
+- ถ้า upstream แก้ `chatCore.js` ให้เลือก transport ตาม targetFormat เอง → LP-017 = UPSTREAM_FIXED (ดูเงื่อนไข headers ด้วย)
+- ถ้า upstream เพิ่ม executor ของ `muse` เอง → รวม LP-018/LP-013 เข้ากับของ upstream ห้ามมี 2 ตัว
+- ถ้า upstream เพิ่ม levels ของ muse-spark → LP-019 เทียบกับค่าที่ Meta รับจริงก่อนทิ้ง
+- รัน `npx vitest run unit/muse-direct-responses.test.js` เป็น gate
 
 ---
 

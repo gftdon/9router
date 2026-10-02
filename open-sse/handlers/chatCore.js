@@ -544,6 +544,12 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   if (!clientRequestedStreaming && providerRequiresStreaming) {
     const result = await handleForcedSSEToJson({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, customToolNames, toolNameMap, trackDone, appendLog });
     if (result) { streamController.handleComplete(); return result; }
+    // LP-029: the upstream answered plain JSON (a same-format body kept stream:false,
+    // e.g. a Responses client on muse) — treat it as the non-stream reply it is
+    // instead of piping JSON through the SSE stream.
+    const nonStream = await handleNonStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, reqLogger, toolNameMap, customToolNames, trackDone, appendLog });
+    streamController.handleComplete();
+    return nonStream;
   }
 
   // True non-streaming response

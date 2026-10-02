@@ -164,21 +164,22 @@ describe("muse direct provider non-stream clients", () => {
     "",
   ].join("\n\n");
 
-  async function nonStream(endpoint, body) {
+  async function nonStream(endpoint, body, upstream = () => new Response(responsesSSE, { status: 200, headers: { "content-type": "text/event-stream" } })) {
     fetchMock.mockReset();
-    fetchMock.mockResolvedValue(new Response(responsesSSE, { status: 200, headers: { "content-type": "text/event-stream" } }));
+    fetchMock.mockResolvedValue(upstream());
     const { handleChatCore } = await import("../../open-sse/handlers/chatCore.js");
     const result = await handleChatCore({
       body: structuredClone(body),
       modelInfo: { provider: "muse", model: MODEL },
       credentials: { accessToken: "test-token", providerSpecificData: {} },
       clientRawRequest: { endpoint, body, headers: {} },
-    // /v1/messages pins the source format in the real route; mirror it.
-    sourceFormatOverride: endpoint === "/v1/messages" ? "claude" : undefined,
+    // /v1/messages and /v1/responses pin the source format in the real route; mirror it.
+    sourceFormatOverride: { "/v1/messages": "claude", "/v1/responses": "openai-responses" }[endpoint],
       connectionId: "test-connection",
       log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     });
     expect(result.success).toBe(true);
+    expect(result.response.headers.get("content-type")).toContain("application/json");
     return result.response.json();
   }
 
@@ -187,6 +188,17 @@ describe("muse direct provider non-stream clients", () => {
     expect(json.type).toBe("message");
     expect(json.content).toEqual([{ type: "text", text: "hi" }]);
     expect(json.usage).toMatchObject({ input_tokens: 9, output_tokens: 2 });
+  });
+
+  // A Responses client's same-format body keeps stream:false, so Meta answers
+  // plain JSON; the forced-SSE handler skipped it and the stream path wrapped
+  // that JSON in an event-stream response. (LP-029)
+  it("returns the upstream JSON response to a non-stream Responses client", async () => {
+    const upstreamJson = { id: "resp_j1", object: "response", status: "completed", model: MODEL, output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "hi" }] }], usage: { input_tokens: 9, output_tokens: 2, total_tokens: 11 } };
+    const json = await nonStream("/v1/responses", { model: MODEL, input: "Say hi.", stream: false },
+      () => new Response(JSON.stringify(upstreamJson), { status: 200, headers: { "content-type": "application/json" } }));
+    expect(json.object).toBe("response");
+    expect(json.output[0].content[0].text).toBe("hi");
   });
 
   it("returns a filled chat.completion to an OpenAI client", async () => {

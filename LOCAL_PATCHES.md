@@ -8,11 +8,11 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-025 + เอกสาร |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `d58788ff` (LP-017..LP-027) |
-| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `d58788ff`, deploy LP-027 2026-10-03 02:0x) — request logs **ปิด**; ตัวที่ผู้ใช้เปิดใน ttys006 ถูกปิดตอน deploy |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-027 + เอกสาร (LP-028..LP-030 รอ push) |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `cb1a19d1` (LP-017..LP-030) |
+| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `cb1a19d1`, deploy LP-028..LP-030 2026-10-03 02:2x) — request logs **ปิด** |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
-| ค้างตรวจ | client `/v1/responses` (Codex CLI / Responses SDK): `muse/…(effort)` 400 `unknown parameter reasoning_effort` เมื่อ `input` เป็น string; `muse/…` non-stream ได้ SSE; `ocg/` model ที่เป็น Responses-only non-stream ได้ chat.completion ว่าง (พบ 2026-10-03 ตอนยืนยัน LP-027, ยังไม่วิเคราะห์) |
+| ค้างตรวจ | Responses upstream ที่ส่ง `event: error` กลาง stream หลัง HTTP 200 (เช่น `ocg/gpt-6-luna` โดน Azure `rate_limit_exceeded` ~50% ตอน probe 2026-10-03) → 9Router คืนผลว่าง (`status:"in_progress"`) แทน error ทำให้ combo ไม่ fallback — ยังไม่แก้ |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
@@ -25,6 +25,9 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `df7999a5` | `open-sse/executors/muse.js` | LP-028: ย้าย effort เข้า `reasoning` เมื่อ Responses body มี `input` เป็น string (แก้ LP-018) | ACTIVE (deploy + ยืนยัน live แล้ว) |
+| `6a389c60` | `open-sse/handlers/chatCore.js` | LP-029: provider ที่ forceStream แต่ตอบ JSON ธรรมดา → ใช้ handler non-stream แทนการห่อ JSON เป็น SSE | ACTIVE (deploy + ยืนยัน live แล้ว) |
+| `cb1a19d1` | `open-sse/handlers/chatCore.js` | LP-030: upstream รูปแบบ Responses ที่ส่ง SSE ให้ client non-stream → แปลงด้วย SSE→JSON handler (เดิมได้ chat.completion ว่าง) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `d58788ff` | `open-sse/providers/thinkingLevels.js` | LP-027: ระดับ effort ของ muse-spark บน `opencode-go` = minimal…max (เดิม `ocg/…(max)` ถูกตัดเหลือ xhigh) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `09c1e5a9` | `open-sse/translator/formats/gemini.js`, `concerns/schemaPlaceholder.js`, `response/gemini-to-openai.js`, `chatCore/nonStreamingHandler.js`, `utils/stream.js`, `executors/antigravity.js` | LP-026 (เดิม Bug A): placeholder `reason` ของ schema ว่างเป็น optional + ตัดออกจาก tool call ที่ส่งกลับ client | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `1df544ca` | `open-sse/providers/pricing.js` | LP-007: เรตตระกูล gpt-6 ตามราคาทางการ OpenAI | UPSTREAM_FIXED (`92c7bdd5`, v0.5.95) |
@@ -1042,6 +1045,33 @@ Claude Code จริง `9-haiku-level` เรียก `TaskList` 3/3 ได�
 → `/v1/responses` stream `ocg/muse-spark-1.3-contributor(max)`: `response.completed` echo `reasoning:{effort:"max"}` ✅; `/v1/messages` `(max)` และ `(xhigh)` 200 ตอบถูก
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เพิ่มระดับ muse-spark ของ opencode-go เอง → UPSTREAM_FIXED
+
+---
+
+## LP-028 / LP-029 / LP-030: client `/v1/responses` (Codex CLI / Responses SDK) บน muse และ ocg
+
+**Status:** ACTIVE · **Commits:** `df7999a5` (LP-028), `6a389c60` (LP-029), `cb1a19d1` (LP-030) · **Implemented:** 2026-10-03 · พบตอนยืนยัน LP-027
+ไม่กระทบ Claude Code (`/v1/messages`) — เฉพาะ client ที่ใช้ `/v1/responses`
+
+**LP-028 — `muse/…(effort)` → 400 `unknown parameter \`reasoning_effort\``:** `MuseExecutor` (LP-018) ย้าย `reasoning_effort` → `reasoning.effort` เฉพาะเมื่อ `input` เป็น array
+แต่ Responses API รับ `input` เป็น string ได้ → ข้ามไป → Meta 400 · **แก้:** เงื่อนไขเป็น "มี `input`" · เทส: Responses client `input` string + `(max)` → `reasoning.effort:"max"`
+
+**LP-029 — `muse/…` non-stream ได้ JSON แต่ content-type เป็น SSE:** body รูปแบบเดียวกับ upstream (Responses → Responses) ไม่ผ่าน translator จึงคง `stream:false`
+→ Meta ตอบ JSON → `handleForcedSSEToJson` คืน null (ไม่ใช่ SSE) → chatCore ตกไปทาง streaming (เพราะ `forceStream` ทำให้ `stream=true`) แล้วห่อ JSON ด้วย header SSE
+**แก้:** ถ้า forced-SSE handler ไม่รับ ให้ใช้ `handleNonStreamingResponse` · เทส: upstream JSON → client ได้ `application/json` `object:"response"`
+
+**LP-030 — `ocg/` model ที่รับเฉพาะ Responses (muse-spark, gpt-6-luna, grok-4.x) non-stream ได้ chat.completion ว่าง:** `OpenCodeGoExecutor` บังคับ `stream:true` ไป upstream
+→ ได้ Responses SSE → `handleNonStreamingResponse` ใช้ parser SSE ของ chat อ่านไม่ออก → ว่าง (ทั้ง client Responses, Claude และ OpenAI)
+**แก้:** ใน chatCore ถ้า `!stream` + upstream เป็น SSE + `providerResponseFormat === openai-responses` → `handleForcedSSEToJson` (มีตัวแปลง Responses SSE → ทุก client format อยู่แล้ว)
+· เทสใหม่ `tests/unit/opencode-go-responses-nonstream.test.js` 3 ข้อ (Responses/Claude/OpenAI client) — แดงทั้ง 3 เมื่อไม่มี fix
+
+**Validation (2026-10-03):** full suite เทียบรายข้อ: ไม่มี fail ใหม่ (pass +5); eslint ผ่าน
+**Deploy + live (2026-10-03 02:2x):** สำรองที่ `/tmp/9router-before-lp028-030-20261003/` → ติดตั้ง build `cb1a19d1` → nohup (logs ปิด) → `/v1/responses`:
+`muse/…(max)` non-stream `application/json` `object:"response"` echo `effort:"max"` ✅ / stream ✅; `muse/…` non-stream JSON ✅; `ocg/muse-spark…(max)` non-stream ได้ข้อความ ✅ / stream echo `max` ✅;
+`cx/gpt-6.1-sol-high` ปกติ; `/v1/messages` ของ `ocg/` และ `muse/` stream + non-stream 200 ตอบถูก
+`ocg/gpt-6-luna` บางครั้งยังว่าง — **ไม่ใช่ปัญหาของ patch นี้:** ยิงตรง OpenCode Go 3/6 ครั้งได้ HTTP 200 แล้ว `event: error` `rate_limit_exceeded` (Azure westus3) ทันทีหลัง `response.created` (ดูตาราง "ค้างตรวจ")
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream แก้ทาง forceStream/Responses non-stream ใน chatCore เอง → เทียบแล้วประเมินทีละตัว
 
 ---
 

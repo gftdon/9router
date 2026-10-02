@@ -45,6 +45,7 @@
 | `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy + ยืนยัน live แล้ว; ไม่ครอบคลุม signature ของ kimi → LP-022) |
 | `5c96c99e`, `4e8d2f28` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (deploy + ยืนยัน live ทั้ง 2 commit) |
 | `0a8e550c` | `open-sse/utils/stream.js`, `open-sse/handlers/chatCore/streamingHandler.js` | LP-023: stream Claude→Claude (passthrough) ถอดชื่อ tool ที่ถูก cloak (`_ide`) กลับ | ACTIVE (deploy + ยืนยัน live แล้ว) |
+| `35f6bbe9` | `open-sse/executors/codex.js` | LP-025: ส่ง `strict:false` ให้ function tool ของ Codex เมื่อ client ไม่ได้ระบุ (กัน codex ใส่ optional argument ครบทุกตัว) | ACTIVE (ยังไม่ deploy) |
 | — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -934,6 +935,32 @@ full suite เทียบรายข้อกับก่อนแก้: ไ�
 request log: `4_req_target` ยังเป็น `calc_ide` (cloak ทำงานตามเดิม) แต่ `7_res_client` ไม่มี `calc_ide` เลย; Claude Code จริง (`9-orchestrator` + Read) ปกติ
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream ส่ง `toolNameMap` เข้า passthrough stream หรือเปลี่ยนให้ same-format ไปทาง translate stream → ประเมินเป็น UPSTREAM_FIXED
+
+---
+
+## LP-025: Codex ใส่ optional argument ของ tool ครบทุกตัว (Agent `model`/`isolation:"worktree"`, Read `offset/limit` …)
+
+**Status:** ACTIVE (commit แล้ว ยังไม่ deploy) · **Commit:** `35f6bbe9` · **Implemented:** 2026-10-03 · **Upstream:** ยังไม่แก้ (v0.5.95)
+(LP-024 จองไว้ให้ Bug D)
+
+**อาการ (ทดสอบ `9-orchestrator` ที่ย้าย `cx/gpt-6.1-sol-high` ขึ้นเป็นตัวแรก 2026-10-03):** ทุก tool call ของ codex ใส่ optional ครบ
+- Agent: `model:"sonnet"/"opus"/"haiku"`, `isolation:"worktree"`, `mode:"default"`, `team_name:""` — `model` ทับ model ที่ agent definition พินไว้ (เทสหนึ่งส่ง `haiku` ให้ fast-worker) และขัด CLAUDE.md; `worktree` ทำให้งานที่แก้ไฟล์ไปอยู่ใน worktree แยก
+- Read `offset:0, limit:2000`; Grep `glob:""`, `-B:0`, `-A:0`; playwright `regex:""` — Claude ในเทิร์นเดียวกันส่งแค่ field ที่จำเป็น
+
+**Root cause:** `normalizeCodexTools` (`open-sse/executors/codex.js`) ประกอบ function tool ใหม่โดยไม่มี `strict` (และ request ที่มาจาก Claude ก็ไม่มี `strict` อยู่แล้ว)
+→ Codex backend ทำ constrained decoding แบบ strict เมื่อไม่ระบุ → โมเดลต้องเติมทุก key
+**ยืนยันด้วยการยิง request ที่ log ไว้ตรงไป `chatgpt.com/backend-api/codex/responses` (tool Agent ของ Claude Code, 3 ครั้งต่อแบบ):**
+ไม่มี `strict` → optional 7/7 ทุกครั้ง · `strict:false` → มีแค่ `subagent_type` ทุกครั้ง · `strict:true` → 400 `'required' … including every key in properties`
+(ยิงผ่าน `/v1/responses` พร้อม `strict:false` ก็ไม่ช่วย เพราะ executor ตัดทิ้ง)
+
+**วิธีแก้:** ใน `normalizeCodexTools` เก็บค่า `strict` ที่ client ส่งมา (ทั้ง flat และ `function.strict`) ถ้าไม่มีให้ใส่ `strict:false` แบบเดียวกับที่ Codex CLI ส่ง
+— namespace/custom/hosted tool ไม่แตะ
+
+**Validation (2026-10-03):** `codex-tool-normalization` +2 เทส (default false, คงค่าที่ client ระบุ) — แดงเมื่อไม่มี fix;
+`codex-gpt6-lite` เทส web_search เทียบ shape tool แบบตรงตัว → เพิ่ม `strict:false` ในค่าที่คาด (เจตนาเดิมคือ web_search ยังอยู่);
+full suite เทียบรายข้อ: ไม่มี fail ใหม่ (`lists gpt-6.1-sol with Codex capabilities` แดงอยู่ก่อนแล้ว — contextWindow 1,050,000 vs 272,000)
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เริ่มส่ง `strict` เองใน codex executor หรือ translator → เทียบแล้วประเมิน UPSTREAM_FIXED
 
 ---
 

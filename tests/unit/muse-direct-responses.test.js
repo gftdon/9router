@@ -126,3 +126,46 @@ describe("muse direct provider effort levels", () => {
     expect(getThinkingLevels("opencode-go", MODEL)).toEqual(["none", "minimal", "low", "medium", "high", "xhigh"]);
   });
 });
+
+describe("muse direct provider non-stream clients", () => {
+  // The Responses translator always sends stream:true, so Meta answers SSE even
+  // for stream:false; without forceStream the chat SSE parser returned an empty
+  // chat.completion. (LP-020)
+  const responsesSSE = [
+    `event: response.created\ndata: ${JSON.stringify({ type: "response.created", response: { id: "resp_m1", created_at: 1700000000 } })}`,
+    `event: response.output_item.done\ndata: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item: { type: "message", role: "assistant", content: [{ type: "output_text", text: "hi" }] } })}`,
+    `event: response.completed\ndata: ${JSON.stringify({ type: "response.completed", response: { usage: { input_tokens: 9, output_tokens: 2, total_tokens: 11 } } })}`,
+    "",
+  ].join("\n\n");
+
+  async function nonStream(endpoint, body) {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(new Response(responsesSSE, { status: 200, headers: { "content-type": "text/event-stream" } }));
+    const { handleChatCore } = await import("../../open-sse/handlers/chatCore.js");
+    const result = await handleChatCore({
+      body: structuredClone(body),
+      modelInfo: { provider: "muse", model: MODEL },
+      credentials: { accessToken: "test-token", providerSpecificData: {} },
+      clientRawRequest: { endpoint, body, headers: {} },
+    // /v1/messages pins the source format in the real route; mirror it.
+    sourceFormatOverride: endpoint === "/v1/messages" ? "claude" : undefined,
+      connectionId: "test-connection",
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+    expect(result.success).toBe(true);
+    return result.response.json();
+  }
+
+  it("returns an Anthropic message to a Claude client", async () => {
+    const json = await nonStream("/v1/messages", { ...claudeBody(), stream: false });
+    expect(json.type).toBe("message");
+    expect(json.content).toEqual([{ type: "text", text: "hi" }]);
+    expect(json.usage).toMatchObject({ input_tokens: 9, output_tokens: 2 });
+  });
+
+  it("returns a filled chat.completion to an OpenAI client", async () => {
+    const json = await nonStream("/v1/chat/completions", { ...openaiBody(), stream: false });
+    expect(json.object).toBe("chat.completion");
+    expect(json.choices[0].message.content).toBe("hi");
+  });
+});

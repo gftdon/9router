@@ -34,6 +34,10 @@ export default {
     validateUrl: "https://api.meta.ai/v1/models",
     modelsUrl: "https://api.meta.ai/v1/models",
     auth: { combined: true, header: "Authorization", scheme: "bearer", hooks: ["museHeaders"] },
+    // LP-020: the Responses translator always sends stream:true, so Meta answers
+    // SSE even for stream:false clients. Declare it so chatCore folds the SSE
+    // back into one JSON body (handleForcedSSEToJson), as for codex/grok-cli.
+    forceStream: true,
   },
   // Multi-endpoint: Meta accepts Chat Completions and Responses wire formats on
   // the same key (https://dev.meta.ai/docs/protocols). Muse Spark reasoning

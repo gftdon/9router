@@ -104,3 +104,13 @@ graphify-out/*
 .start-dev.ps1
 start-dev-silent.cjs
 debug.log
+
+# local data dir for source runs
+.data/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+AGENTS.md
+bun.lock
+cli/bun.lock
+.Ignore

@@ -9,10 +9,10 @@
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
 | `origin/master` (`gftdon/9router`) | push ครบถึง LP-025 + เอกสาร |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `a5027546` (LP-017..LP-025) |
-| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `a5027546`) — **ปิด request logs แล้ว** ตั้งแต่ 2026-10-03 01:3x; **ไม่ได้**รันจาก LaunchAgent / ttys006 |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `09c1e5a9` (LP-017..LP-026) |
+| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `09c1e5a9`, deploy LP-026 2026-10-03 01:5x) — request logs **ปิด**; **ไม่ได้**รันจาก LaunchAgent / ttys006 (ตัวที่ผู้ใช้เปิดใน ttys006 ถูกปิดตอน deploy) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
-| ค้างตรวจ | Bug A (gemini `reason`), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh; `glm/glm-5.3` ติดโควตา 5 ชม. ของบัญชี (ไม่ใช่โค้ด) ตอนทดสอบ 2026-10-03 |
+| ค้างตรวจ | `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh; `glm/glm-5.3` ติดโควตา 5 ชม. ของบัญชี (ไม่ใช่โค้ด) ตอนทดสอบ 2026-10-03 |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
@@ -25,7 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
-| — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | NEEDS_REVIEW |
+| `09c1e5a9` | `open-sse/translator/formats/gemini.js`, `concerns/schemaPlaceholder.js`, `response/gemini-to-openai.js`, `chatCore/nonStreamingHandler.js`, `utils/stream.js`, `executors/antigravity.js` | LP-026 (เดิม Bug A): placeholder `reason` ของ schema ว่างเป็น optional + ตัดออกจาก tool call ที่ส่งกลับ client | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `1df544ca` | `open-sse/providers/pricing.js` | LP-007: เรตตระกูล gpt-6 ตามราคาทางการ OpenAI | UPSTREAM_FIXED (`92c7bdd5`, v0.5.95) |
 | `99ec5852` | `open-sse/providers/pricing.js` | LP-008: resolve ราคาเมื่อ model id มี effort suffix | ACTIVE / KEPT (v0.5.95) |
 | `b6298d96` | `open-sse/providers/pricing.js` | LP-009: gpt-5.6 sol/luna/terra ไม่ตก wildcard + เรตตรงทางการ | ACTIVE / MODIFIED (v0.5.95 — upstream ใส่เรตผิด; cache write → 1.25x ตามทางการ) |
@@ -994,9 +994,39 @@ Agent ส่งแค่ `description`, `subagent_type`, `name` (ไม่มี
 
 ---
 
+## LP-026: Gemini/Antigravity ส่ง `reason` ให้ tool ที่ไม่มี parameter → Claude Code `InputValidationError` (เดิม Bug A)
+
+**Status:** ACTIVE · **Commit:** `09c1e5a9` · **Implemented:** 2026-10-03 · **Upstream:** ยังไม่แก้ (v0.5.95; placeholder มาจาก `e3e3e235` "fill empty tool schemas after $ref strip") — CASE A
+
+**อาการ (ยืนยันก่อนแก้ 2026-10-03):** Claude Code จริง `--model 9-haiku-level` (ตอบโดย `gemini-3.8-flash`) สั่งเรียก `TaskList` →
+6/7 ครั้งได้ `TaskList {"reason": "ตรวจสอบรายการงาน…"}` → `InputValidationError: TaskList failed … An unexpected parameter \`reason\` was provided`;
+ยิง API ตรงด้วย tool schema ว่าง (`TaskList`, `Ping`): ag/`9-haiku-level` ใส่ `reason` ทั้ง stream/non-stream; grok/codex ส่ง `{}` ปกติ
+กระทบ tool ไม่มี parameter (`TaskList`, `EnterPlanMode`, `CronList` …) เฉพาะเส้นทาง Gemini/Antigravity/Vertex — combo `9-haiku-level`, `9-browser-task`, ตอน `9-fast-worker`/`9-content-scoring` ตกไป ag
+
+**Root cause:** `cleanJSONSchemaForAntigravity` → `addPlaceholders` เติม `properties.reason` + `required:["reason"]` ให้ object schema ที่ว่าง (Vertex/Antigravity ไม่รับ properties ว่าง)
+→ โมเดลเห็นว่า required จึงส่งมาแทบทุกครั้ง และฝั่ง response ไม่มีใครตัดออก
+
+**วิธีแก้:**
+- placeholder ย้ายไป `translator/concerns/schemaPlaceholder.js` และ**ไม่ใส่ `required`** (ยังคง property ไว้ให้ Gemini รับ schema) — ทั้งใน cleaner และ fallback ของ `AntigravityExecutor`
+- ตัด `reason` ออกจาก argument ของ functionCall ที่แปลงกลับ **เฉพาะตำแหน่งที่ schema เดิมของ client ไม่มี properties** (จุดเดียวกับที่ cleaner เติม; รองรับ object ซ้อน/`items`)
+  — stream: `gemini-to-openai.js` อ่าน `state.clientToolSchemas` (สร้างจาก `body.tools` ใน `createSSEStream`); non-stream: `translateNonStreamingResponse(…, clientToolSchemas)`
+- tool ที่มี `reason` เป็น parameter จริง หรือ tool ที่ไม่รู้จัก → ไม่แตะ
+
+**Validation (2026-10-03):** `tests/unit/gemini-schema-placeholder-strip.test.js` 5 ข้อ (cleaner ไม่ required, strip เฉพาะ schema ว่าง/ซ้อน, non-stream, stream, tool ไม่รู้จัก) — 3 ข้อที่แตะ wiring แดงเมื่อไม่มี fix;
+full suite เทียบรายข้อ: ไม่มี fail ใหม่ (pass +5); eslint ผ่าน
+**Deploy + live (2026-10-03 01:5x):** สำรองที่ `/tmp/9router-before-lp026-20261003/` → ปิด server ที่ผู้ใช้เปิดใน ttys006 (ไม่มี request logs) → ติดตั้ง build `09c1e5a9`
+→ เปิด `9router --tray --skip-update` แบบ nohup (logs ปิด) → API: ag/`9-haiku-level` stream+non-stream ได้ `TaskList {}`, `Ping {}`, `Note {"reason":"test"}` (reason จริงยังอยู่);
+Claude Code จริง `9-haiku-level` เรียก `TaskList` 3/3 ได้ `{}` → `No tasks found` ไม่มี error
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เปลี่ยน placeholder (ชื่อ/required) หรือเพิ่มการ strip เอง → เทียบ `addPlaceholders` แล้วประเมิน UPSTREAM_FIXED
+
+---
+
 ## Patch ที่ยังไม่ได้แก้ (รอตัดสินใจ)
 
-### Bug A: `reason` injection ใน tool schema ว่าง (gemini/antigravity path)
+### Bug A → แก้แล้วเป็น LP-026 (ดูหัวข้อ LP-026 ด้านบน) — บันทึกเดิม:
+
+#### Bug A: `reason` injection ใน tool schema ว่าง (gemini/antigravity path)
 
 **สถานะ:** NEEDS_REVIEW — ประเด็นเดิมที่ยังไม่ได้แก้ · **ไฟล์:** `open-sse/translator/formats/gemini.js`, `cleanJSONSchemaForAntigravity()`
 

@@ -5,6 +5,8 @@ import { extractUsage, mergeUsage, hasValidUsage, estimateUsage, logUsage, addBu
 import { parseSSELine, hasValuableContent, fixInvalidId, formatSSE } from "./streamHelpers.js";
 import { getOpenAIResponsesEventName, isOpenAIResponsesTerminalEvent, formatIncompleteOpenAIResponsesStreamFailure } from "./responsesStreamHelpers.js";
 import { dbg, isDebugEnabled } from "./debugLog.js";
+import { decloakStreamChunk } from "./claudeCloaking.js";
+import { restoreToolNames } from "./opencodeFingerprint.js";
 
 import { SSE_DONE, SSE_HEADERS, SSE_HEADERS_NO_BUFFER } from "./sseConstants.js";
 
@@ -166,12 +168,19 @@ export function createSSEStream(options = {}) {
 
           if (trimmed.startsWith("data:") && trimmed.slice(5).trim() !== "[DONE]") {
             try {
-              const parsed = JSON.parse(trimmed.slice(5).trim());
+              let parsed = JSON.parse(trimmed.slice(5).trim());
 
               const idFixed = fixInvalidId(parsed);
 
               // Ensure OpenAI-required fields are present on streaming chunks (Letta compat)
               let fieldsInjected = false;
+
+              // LP-023: same-format Claude streams skip translateResponse(), so the
+              // cloaked ("_ide"-suffixed) tool name must be restored here too.
+              if (toolNameMap?.size) {
+                const restored = restoreToolNames(decloakStreamChunk(parsed, toolNameMap), toolNameMap);
+                if (restored !== parsed) { parsed = restored; fieldsInjected = true; }
+              }
               if (parsed.choices !== undefined) {
                 if (!parsed.object) { parsed.object = "chat.completion.chunk"; fieldsInjected = true; }
                 if (!parsed.created) { parsed.created = Math.floor(Date.now() / 1000); fieldsInjected = true; }
@@ -553,11 +562,12 @@ export function createSSETransformStreamWithLogger(targetFormat, sourceFormat, p
   });
 }
 
-export function createPassthroughStreamWithLogger(provider = null, reqLogger = null, model = null, connectionId = null, body = null, onStreamComplete = null, apiKey = null) {
+export function createPassthroughStreamWithLogger(provider = null, reqLogger = null, model = null, connectionId = null, body = null, onStreamComplete = null, apiKey = null, toolNameMap = null) {
   return createSSEStream({
     mode: STREAM_MODE.PASSTHROUGH,
     provider,
     reqLogger,
+    toolNameMap,
     model,
     connectionId,
     body,

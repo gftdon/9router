@@ -2,7 +2,7 @@ import { detectFormat, getTargetFormat, resolveTransport } from "../services/pro
 import { translateRequest } from "../translator/index.js";
 import { applyThinking, extractThinking, stripThinkingSuffix } from "../translator/concerns/thinkingUnified.js";
 import { FORMATS } from "../translator/formats.js";
-import { normalizeClaudePassthrough, anchorClaudeCache } from "../translator/formats/claude.js";
+import { normalizeClaudePassthrough, anchorClaudeCache, isInvalidThinkingSignatureError, stripThinkingForSignatureRetry } from "../translator/formats/claude.js";
 import { createStreamController } from "../utils/streamHandler.js";
 import { refreshWithRetry } from "../services/tokenRefresh.js";
 import { createRequestLogger } from "../utils/requestLogger.js";
@@ -472,6 +472,42 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
       }
     } catch (e) {
       log?.warn?.("TOKEN", `${provider.toUpperCase()} | refresh threw: ${e.message}`);
+    }
+  }
+
+  // LP-022: a combo turn served by another model can leave a foreign-signed
+  // thinking block in the history; Anthropic 400s it. Retry once without the
+  // thinking blocks rather than guessing which signatures are Claude's.
+  if (providerResponse.status === 400 && targetFormat === FORMATS.CLAUDE) {
+    const errText = await providerResponse.clone().text().catch(() => "");
+    const retryBody = isInvalidThinkingSignatureError(400, errText)
+      ? stripThinkingForSignatureRetry(translatedBody)
+      : null;
+    if (retryBody) {
+      log?.warn?.("THINKING", `${provider}/${model} | invalid thinking signature, retrying without thinking blocks`);
+      try {
+        const retryResult = await executor.execute({
+          model,
+          body: retryBody,
+          stream,
+          credentials,
+          providerSessionId: sessionSeed,
+          clientTool,
+          signal: streamController.signal,
+          log,
+          proxyOptions,
+          providerOverrides,
+        });
+        translatedBody = retryBody;
+        providerResponse = retryResult.response;
+        providerUrl = retryResult.url;
+        providerHeaders = retryResult.headers;
+        finalBody = retryResult.transformedBody;
+        providerResponseFormat = retryResult.responseFormat || targetFormat;
+        reqLogger.logTargetRequest(providerUrl, providerHeaders, finalBody);
+      } catch (e) {
+        log?.warn?.("THINKING", `${provider}/${model} | retry without thinking failed: ${e.message}`);
+      }
     }
   }
 

@@ -213,6 +213,48 @@ function isUnsignedThinking(block) {
   return false;
 }
 
+// LP-022: Anthropic's answer when history carries a thinking block signed by
+// another model (a combo turn that fell back to kimi keeps kimi's signature).
+// Signatures are opaque (LP-003), so the request is retried once without them.
+const INVALID_THINKING_SIGNATURE = /Invalid `signature` in `thinking` block/i;
+
+export function isInvalidThinkingSignatureError(status, text) {
+  return status === 400 && typeof text === "string" && INVALID_THINKING_SIGNATURE.test(text);
+}
+
+// Copy of a Claude body with every thinking/redacted_thinking block removed from
+// assistant turns. Thinking is switched off for the retry when the final
+// assistant turn lost its thinking (the API requires one there when enabled),
+// together with the clear_thinking context edits that depend on it.
+export function stripThinkingForSignatureRetry(body) {
+  if (!body || !Array.isArray(body.messages)) return null;
+  const isThinking = (b) => b?.type === CLAUDE_BLOCK.THINKING || b?.type === CLAUDE_BLOCK.REDACTED_THINKING;
+  let stripped = 0;
+  let lastAssistantLostThinking = false;
+  const lastAssistant = body.messages.map((m) => m.role).lastIndexOf(ROLE.ASSISTANT);
+  const messages = [];
+  body.messages.forEach((msg, i) => {
+    if (msg.role !== ROLE.ASSISTANT || !Array.isArray(msg.content)) { messages.push(msg); return; }
+    const content = msg.content.filter((b) => !isThinking(b));
+    const removed = msg.content.length - content.length;
+    stripped += removed;
+    if (removed && i === lastAssistant) lastAssistantLostThinking = true;
+    if (content.length) messages.push({ ...msg, content });
+  });
+  if (!stripped) return null;
+  const out = { ...body, messages };
+  if (lastAssistantLostThinking) {
+    delete out.thinking;
+    const edits = out.context_management?.edits;
+    if (Array.isArray(edits)) {
+      const kept = edits.filter((e) => !String(e?.type || "").startsWith("clear_thinking"));
+      if (kept.length) out.context_management = { ...out.context_management, edits: kept };
+      else delete out.context_management;
+    }
+  }
+  return out;
+}
+
 // Normalize a native Claude passthrough body to match Anthropic Messages API spec.
 // Newer Cowork/Claude Code clients emit beta-only shapes that OAuth endpoints reject:
 // 1. thinking.type "adaptive" → unsupported on Haiku

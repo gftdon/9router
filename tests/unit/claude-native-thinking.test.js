@@ -142,4 +142,79 @@ describe("Claude Code native combo thinking round-trip", () => {
     }, "claude-opus-5-5");
     expect(out.messages.map((m) => m.role)).toEqual(["user", "user"]);
   });
+
+  // LP-022: a kimi-signed (non-empty, foreign) thinking block passes LP-021,
+  // and Anthropic answers 400 "Invalid `signature` in `thinking` block".
+  describe("retry without thinking on an invalid signature", () => {
+    const signatureError = () => new Response(JSON.stringify({
+      type: "error",
+      error: { type: "invalid_request_error", message: "messages.1.content.0: Invalid `signature` in `thinking` block" },
+    }), { status: 400, headers: { "content-type": "application/json" } });
+    const ok = () => ({
+      response: new Response("{}", { headers: { "content-type": "application/json" } }),
+      url: "https://api.anthropic.com/v1/messages", headers: {}, transformedBody: null,
+    });
+
+    async function send(firstResponse, { toolLoop = false } = {}) {
+      executeMock.mockReset();
+      executeMock
+        .mockResolvedValueOnce({ ...ok(), response: firstResponse })
+        .mockResolvedValueOnce(ok());
+      const assistant = [
+        { type: "thinking", thinking: "kimi reasoning", signature: "kimi-own-signature-fixture" },
+        toolLoop
+          ? { type: "tool_use", id: "toolu_fixture", name: "Read", input: {} }
+          : { type: "text", text: "391" },
+      ];
+      const request = {
+        model: "claude-opus-5-5", stream: false, max_tokens: 4096,
+        thinking: { type: "enabled", budget_tokens: 2048 },
+        context_management: { edits: [{ type: "clear_thinking_20251015" }, { type: "clear_tool_uses_20250919" }] },
+        tools: [{ name: "Read", input_schema: { type: "object", properties: {} } }],
+        messages: [
+          { role: "user", content: "What is 17*23?" },
+          { role: "assistant", content: assistant },
+          toolLoop
+            ? { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_fixture", content: "ok" }] }
+            : { role: "user", content: "Add 9." },
+        ],
+      };
+      const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
+      await handleChatCore({
+        body: request, modelInfo: { provider: "claude", model: "claude-opus-5-5" },
+        credentials: { accessToken: "fixture", providerSpecificData: {} },
+        log, connectionId: "fixture", rtkEnabled: false, headroomEnabled: false,
+        cavemanEnabled: false, ponytailEnabled: false, pxpipeEnabled: false,
+        sourceFormatOverride: "claude",
+        clientRawRequest: {
+          endpoint: "/v1/messages", body: request,
+          headers: { "user-agent": "claude-cli/2.1.278", accept: "application/json" },
+        },
+      });
+      return executeMock.mock.calls.map((call) => call[0].body);
+    }
+
+    it("retries once with the thinking blocks removed", async () => {
+      const bodies = await send(signatureError());
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0].messages[1].content.some(isThinking)).toBe(true);
+      expect(bodies[1].messages[1].content.some(isThinking)).toBe(false);
+      expect(bodies[1].messages[1].content.map((b) => b.type)).toEqual(["text"]);
+    });
+
+    it("turns thinking off when the current tool loop lost its thinking", async () => {
+      const bodies = await send(signatureError(), { toolLoop: true });
+      expect(bodies).toHaveLength(2);
+      expect(bodies[1].messages[1].content.map((b) => b.type)).toEqual(["tool_use"]);
+      expect(bodies[1]).not.toHaveProperty("thinking");
+      expect(bodies[1].context_management?.edits?.map((e) => e.type)).toEqual(["clear_tool_uses_20250919"]);
+    });
+
+    it("does not retry other 400s", async () => {
+      const other = new Response(JSON.stringify({ type: "error", error: { type: "invalid_request_error", message: "max_tokens: too large" } }),
+        { status: 400, headers: { "content-type": "application/json" } });
+      const bodies = await send(other);
+      expect(bodies).toHaveLength(1);
+    });
+  });
 });

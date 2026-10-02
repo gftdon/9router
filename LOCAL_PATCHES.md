@@ -852,8 +852,14 @@ turn ที่ว่างหลังทิ้งจะถูกขั้นถ
 
 **Live test (2026-10-03):** ขอ thinking จริงจาก `cc/claude-opus-5-5` (ได้ signature 816 ตัวอักษร) แล้วส่งประวัติผสม: thinking `signature:""` (จำลองเทิร์น kimi) + thinking ที่ signed จริง
 - **ด้วย UA ของ Claude Code** (`claude-cli/2.1.287`, เส้น passthrough ของ LP-003): request log `4_req_target.json` ยืนยัน wire = `str | text | str | thinking+text | str`
-  → block ที่ signature ว่างถูกทิ้ง, signature จริงถูกส่งต่อ **byte-for-byte** — แต่ Anthropic ตอบ **429 `rate_limit_error`** ทุกครั้ง (00:02–00:07)
-  ทั้ง request ที่เล็กที่สุดก็ 429 → เป็น rate limit ของบัญชี Claude ไม่ใช่ผลของ LP-021; ยังไม่ได้ผล 200 ยืนยันว่า Anthropic รับ
+  → block ที่ signature ว่างถูกทิ้ง, signature จริงถูกส่งต่อ **byte-for-byte** — แต่ Anthropic ตอบ **429 `rate_limit_error` ("Error")** ทุกครั้ง (00:02–00:07)
+  **สาเหตุของ 429 (แก้ข้อสรุปเดิมที่ว่าเป็น rate limit ของบัญชี — ผิด):** เป็นวิธีทดสอบ ไม่ใช่ LP-021 และไม่ใช่โควตา —
+  curl ปลอม UA `claude-cli/…` ทำให้ 9Router มองเป็น Claude Code native passthrough (`isNativePassthrough` ดูแค่ client tool จาก UA) จึง**ไม่ cloak**
+  แต่ body ของ curl ไม่มีสิ่งที่ Claude Code จริงส่ง: `system` ที่มี `x-anthropic-billing-header`, `metadata.user_id`, header `x-claude-code-session-id`
+  → Anthropic ปฏิเสธ OAuth request ที่ไม่ระบุตัวเป็น Claude Code ด้วย 429 "Error" ทุกขนาด (แม้ `max_tokens: 50` ไม่มี thinking)
+  ส่วน request UA curl ที่ผ่าน 200 ถูก cloak ครบ (billing header + metadata + session id) ใน `4_req_target.json`
+  ทดสอบ "curl ก็ 429" ช่วง 00:03 ไม่มี log เพราะถูก `modelLock` ของ 9Router ตีกลับก่อนถึง Anthropic
+  ผลกระทบต่อ Claude Code จริง: ไม่มี (ส่ง billing header/metadata เอง; claude ผ่าน `9-orchestrator` 37 request ok ในช่วง log 20:50–21:40)
 - **ด้วย UA อื่น (curl):** HTTP 200 ตอบถูก ("400") แต่เส้นนี้ 9Router ตัด thinking ของเทิร์นก่อนทิ้งทั้งหมดอยู่แล้ว (พฤติกรรม upstream สำหรับ client ที่ไม่ใช่ Claude Code) จึงไม่ได้ทดสอบ LP-021 จริง
 - ⚠️ ทุกครั้งที่ 429, 9Router ตั้ง `modelLock_claude-opus-5-5` ใหม่ (~2 วินาทีถึงนาที) → หยุดยิงทดสอบซ้ำเพื่อไม่ให้ session อื่นโดน lock ต่อ
 - **ค้าง:** ยิง request แบบ Claude Code ซ้ำเมื่อ rate limit หาย แล้วต้องได้ 200; หรือดูจาก log ว่า session ยาวของ `9-orchestrator` ไม่เจอ 400 `Invalid signature` อีก

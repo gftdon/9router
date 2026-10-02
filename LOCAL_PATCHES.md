@@ -7,25 +7,79 @@
 
 | Commit | ไฟล์ที่แก้ | แก้อะไร | สถานะ |
 |---|---|---|---|
-| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / KEPT (v0.5.91) |
-| `0bb6cc65` | `src/sse/services/model.js` | Patch 2: strip `[1m]` suffix ตอน resolve combo name | ACTIVE / REDUNDANT-สำหรับ chat path (v0.5.91) |
-| `c31f4070` | `open-sse/translator/formats/gemini.js` | LP-006: strip schema annotations โดยรักษาชื่อ property จริง (เพิ่มทะเบียนย้อนหลัง) | ACTIVE / KEPT (v0.5.91) |
-| `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.91) |
-| `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.91, rebased) |
+| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / MODIFIED (v0.5.95 — ผ่าน `refine()` ของ upstream) |
+| `0bb6cc65` | `src/sse/services/model.js` | Patch 2: strip `[1m]` suffix ตอน resolve combo name | ACTIVE / REDUNDANT-สำหรับ chat path (v0.5.95) |
+| `c31f4070` | `open-sse/translator/formats/gemini.js` | LP-006: strip schema annotations โดยรักษาชื่อ property จริง (เพิ่มทะเบียนย้อนหลัง) | ACTIVE / KEPT (v0.5.95) |
+| `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
+| `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
 | — | `open-sse/translator/formats/gemini.js` | Bug A: `reason` injection (ยังไม่ได้แก้) | NEEDS_REVIEW |
-| `1df544ca` | `open-sse/providers/pricing.js` | LP-007: เรตตระกูล gpt-6 ตามราคาทางการ OpenAI | ACTIVE |
-| `99ec5852` | `open-sse/providers/pricing.js` | LP-008: resolve ราคาเมื่อ model id มี effort suffix | ACTIVE |
-| `b6298d96` | `open-sse/providers/pricing.js` | LP-009: gpt-5.6 sol/luna/terra ไม่ตก wildcard + เรตตรงทางการ | ACTIVE |
-| `d09abdcb` | `src/lib/db/repos/usageRepo.js` | LP-010: warn เมื่อไม่มี pricing entry (เลิกเงียบ) | ACTIVE |
-| `594fcba0` | `tests/vitest.config.js` | LP-011: บังคับ DATA_DIR แยกตอนรันเทส (กัน DB จริงโดนเขียน) | ACTIVE |
-| `cc176d22` | `scripts/backfill-usage-cost.mjs`, `src/lib/db/helpers/dateKey.js` | LP-012: สคริปต์ backfill ยอด cost ย้อนหลัง | ACTIVE |
-| `ba910b94` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/opencode{,-go,-zen}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE |
-| `7fd7ee12`, `d48c12c8` | `open-sse/providers/registry/codex.js`, `open-sse/providers/pricing.js` | LP-014: bump Codex CLI identity → 0.159.0 + เพิ่ม gpt-6.1-sol | ACTIVE |
-| `c85dc41e` | `open-sse/config/grokCli.js` (+7 ไฟล์) | LP-015: backport upstream `6b9dc54d` — Grok CLI identity 0.2.99 → 1.0.44 (แก้ HTTP 426) | UPSTREAM_FIXED (backport) |
-| `8f7c6cde` | `open-sse/handlers/chatCore/{sseToJsonHandler,nonStreamingHandler,claudeMessageBody}.js` | LP-016 (เดิม Bug C): `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน Anthropic `message` แทน chat.completion | ACTIVE |
+| `1df544ca` | `open-sse/providers/pricing.js` | LP-007: เรตตระกูล gpt-6 ตามราคาทางการ OpenAI | UPSTREAM_FIXED (`92c7bdd5`, v0.5.95) |
+| `99ec5852` | `open-sse/providers/pricing.js` | LP-008: resolve ราคาเมื่อ model id มี effort suffix | ACTIVE / KEPT (v0.5.95) |
+| `b6298d96` | `open-sse/providers/pricing.js` | LP-009: gpt-5.6 sol/luna/terra ไม่ตก wildcard + เรตตรงทางการ | ACTIVE / MODIFIED (v0.5.95 — upstream ใส่เรตผิด; cache write → 1.25x ตามทางการ) |
+| `d09abdcb` | `src/lib/db/repos/usageRepo.js` | LP-010: warn เมื่อไม่มี pricing entry (เลิกเงียบ) | ACTIVE / KEPT (v0.5.95) |
+| `594fcba0` | `tests/vitest.config.js` | LP-011: บังคับ DATA_DIR แยกตอนรันเทส (กัน DB จริงโดนเขียน) | ACTIVE / KEPT (v0.5.95) |
+| `cc176d22` | `scripts/backfill-usage-cost.mjs`, `src/lib/db/helpers/dateKey.js` | LP-012: สคริปต์ backfill ยอด cost ย้อนหลัง | ACTIVE / KEPT (v0.5.95) |
+| `ba910b94` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/opencode{,-go,-zen}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE / KEPT (v0.5.95) |
+| `7fd7ee12`, `d48c12c8` | `open-sse/providers/registry/codex.js`, `open-sse/providers/pricing.js` | LP-014: bump Codex CLI identity → 0.159.0 + เพิ่ม gpt-6.1-sol | UPSTREAM_FIXED (`ca6e8407`, `dec820b9`, v0.5.95) |
+| `c85dc41e` | `open-sse/config/grokCli.js` (+7 ไฟล์) | LP-015: backport upstream `6b9dc54d` — Grok CLI identity 0.2.99 → 1.0.44 (แก้ HTTP 426) | UPSTREAM_FIXED (`6b9dc54d` อยู่ใน v0.5.95 แล้ว) |
+| `8f7c6cde` | `open-sse/handlers/chatCore/{sseToJsonHandler,nonStreamingHandler,claudeMessageBody}.js` | LP-016 (เดิม Bug C): `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน Anthropic `message` แทน chat.completion | ACTIVE / KEPT (v0.5.95) |
+
+| — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
+
+## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.95 — 2026-10-02
+
+Upstream: tag `v0.5.95`, commit `a99cf57239ff778b61e434c2786009d5ed1c412c` (41 commits, 137 files เทียบกับ `v0.5.91`)
+Merge commit ของ fork: `c3deacad` (ทำบน branch `upgrade/v0.5.95` ใน worktree แยก แล้ว fast-forward `master`) — ใช้ merge ตามแบบรอบ v0.5.86/v0.5.91
+เพราะประวัติ fork มี merge commit อยู่แล้ว การ rebase จะต้องเขียนประวัติที่ push ไปแล้วใหม่; ตรวจ implementation จริงของ upstream ทุกตัว ไม่ได้ตัดสินจาก changelog
+
+### ไฟล์ที่ upstream แตะทับแพตช์
+
+| ไฟล์ | upstream commit ใน v0.5.91..v0.5.95 | ผลต่อแพตช์ |
+|---|---|---|
+| `open-sse/providers/pricing.js` | `92c7bdd5` (GPT-6 Sol/Luna pricing), `dec820b9` (gpt-6.1-sol), Muse/Sonnet 5.5 rows | **conflict** — บล็อก gpt-5.6 / gpt-6 |
+| `open-sse/providers/capabilities.js` | `89ffac5a` (GPT-6/5.4+ context windows, `refine()` catalog overlay ที่ step 2) | **conflict** — บรรทัด canonical lookup ของ Patch 1 |
+| `open-sse/providers/registry/codex.js`, `tests/unit/codex-gpt6-lite.test.js` | `ca6e8407` (CLI identity 0.159.0), `dec820b9` | **conflict** — เหลือแค่ comment/รูปแบบเทส ค่าเท่ากัน |
+| `open-sse/config/grokCli.js` (+7) | `6b9dc54d` | auto-merge — เนื้อหาเท่ากับ backport `c85dc41e` ทุกไฟล์ (`git diff v0.5.95 -- open-sse/config/grokCli.js` ว่าง) |
+| `open-sse/executors/default.js`, `translator/formats/{claude,gemini}.js` | `5e9bd464`, `75834e96`, `ccd0677d`, `08b21fea`, `4f274c7f`, `aafe3002` | auto-merge คนละบล็อกกับ LP-003/LP-004/LP-006 |
+
+### ผลประเมินรายแพตช์
+
+| Patch | ผล | หลักฐานที่ตรวจจริงใน v0.5.95 |
+|---|---|---|
+| Patch 1 — GLM-5.2 suffix lookup | **MODIFIED** | upstream ยังไม่ strip suffix (`replace(/\(` ใน `capabilities.js` = 0 hit) แต่ step 2 เปลี่ยนเป็น `refine(caps, provider, model)` → resolve ให้ lookup ที่ strip แล้วผ่าน `refine()` ด้วย (ส่ง `lookupModel` ให้ catalog) runtime: ctx = 1000000 ทั้ง `glm-5.2` และ `glm-5.2(high)` |
+| Patch 2 — Combo `[1m]` | REDUNDANT สำหรับ chat path (คงเดิม) | `stripModelContextMarker` ยังอยู่ `chat.js:55`; `tts.js:48` / `imageGeneration.js:50` ยังไม่ strip |
+| LP-003 — native thinking | KEPT | upstream ยัง `isValidClaudeSignature(block.signature)` + `unshift(buildThinkingPlaceholder(...))` (`claude.js:285,300,619,640`) ส่วนแก้ prefill/Sonnet 5.x ของ upstream ไม่ได้แตะเรื่องนี้ |
+| LP-004 — native client version | KEPT | v0.5.95 `default.js` ไม่อ่าน `rawHeaders["user-agent"]` เลย (0 hit) |
+| LP-005 | UPSTREAM_FIXED (คงเดิม) | — |
+| LP-006 — Gemini schema | KEPT | upstream `aafe3002` เพิ่ม `errorMessage` เข้า keyword list แต่ยังไม่มี `isPropertyMap` (0 hit) → property ชื่อ `errorMessage`/`title`/`format` ยังโดนลบถ้าไม่มีแพตช์ |
+| LP-007 — gpt-6 rates | **UPSTREAM_FIXED** | `92c7bdd5`/`dec820b9`: astra 10/1/50, sol 2/0.20/10, 6.1-sol 2/0.10/10, luna 0.10/0.01/0.50 — ตรงหน้า pricing ทางการ (ตรวจ 2026-10-02) ใช้ฝั่ง upstream |
+| LP-008 — effort suffix pricing | KEPT | upstream ยังไม่มี glob `gpt-6*` และไม่ strip suffix → `gpt-6-astra-high` = 10/1/50 เพราะแพตช์; tier `gpt-5.3-codex-high` ยังเท่าเดิม (8/4/32) |
+| LP-009 — gpt-5.6 sol/terra/luna | **MODIFIED** | upstream ใส่ sol 5/0.50/30, terra 2.50/0.25/15, luna 1/0.10/6 ซึ่ง**ไม่ตรง**หน้าทางการ (sol 4/0.40/20, terra 2/0.20/12, luna 0.20/0.02/1.20) → เก็บเรตเรา แต่แก้ `cache_creation` ทั้ง MODEL_PRICING และ pattern `gpt-5.6-*-*` เป็นราคา cache write ทางการ (5.00 / 2.50 / 0.25 = 1.25x input) ตามแบบที่ upstream ใช้กับ gpt-6 |
+| LP-010 / LP-011 / LP-012 | KEPT | upstream ไม่มี warn (`no pricing` 0 hit), `tests/vitest.config.js` ไม่มี `DATA_DIR` (`57c04f00` แค่ลบเทสที่เขียน DB จริงบางไฟล์ ไม่ได้กันทั้ง suite), ไม่มีสคริปต์ backfill |
+| LP-013 — Muse Spark depth | KEPT + note | ยังใช้กับ opencode/opencode-go/opencode-zen ครบ; **ใหม่:** upstream เพิ่ม provider `muse` (Meta Model API ตรง, `28809807`) ซึ่ง**ไม่ผ่าน**ตัวจำกัดความลึกนี้ — ถ้าเริ่มใช้ provider นั้นและเจอ error ความลึก schema ให้ขยาย LP-013 |
+| LP-014 — Codex identity + gpt-6.1-sol | **UPSTREAM_FIXED** | `ca6e8407` ตั้ง `CODEX_CLI_VERSION = "0.159.0"`, `dec820b9` เพิ่ม gpt-6.1-sol (model + pricing เท่ากับของเรา) → resolve ใช้ไฟล์ upstream; ไม่มีโค้ด LP-014 เหลือเป็น delta |
+| LP-015 — Grok CLI 1.0.44 | **UPSTREAM_FIXED (ปิด)** | `6b9dc54d` อยู่ใน v0.5.95 แล้ว merge พามาเหมือนกันทุกไฟล์ ไม่มี delta เหลือ |
+| LP-016 — Claude non-stream on forced-stream | KEPT | upstream `sseToJsonHandler.js` ไม่มีกิ่ง `FORMATS.CLAUDE` (0 hit); #3682/#3199/#3462 ยัง OPEN |
+| Bug A — empty-schema `reason` | NEEDS_REVIEW (ไม่เปลี่ยน) | ยังคืน `properties.reason` + `required:["reason"]` |
+
+### Validation (2026-10-02)
+
+- **Full suite (เทียบราย assertion กับ master ก่อน merge):** master 103 failed, หลัง merge 106 failed จาก 3,208 tests
+  **ไม่มี regression จากแพตช์หรือ merge** — 3 รายการที่เพิ่มแดงพิสูจน์ด้วย worktree ของ **tag `v0.5.95` เปล่า** ว่าแดงเหมือนกันเป๊ะ (3 failed / 32 passed):
+  `cline-free-tier-models` (paid twin pricing), `codex-gpt6-lite` (gpt-6.1-sol capabilities), `codex-refresh-token` (`getRefreshLeadMs` 600000 vs 432000000)
+- **Patch regression tests:** `claude-client-version`, `claude-forced-sse-nonstream`, `claude-native-thinking`, `muse-spark-tool-schema-depth`,
+  `pricing-effort-suffix`, `capabilities` → **6 ไฟล์ 70 tests ผ่านทั้งหมด**
+- **Baselines:** aliases (122 tokens) ✅, OAuth URLs ✅, providers ❌ `codex.headers` 0.155.0 → 0.159.0 (snapshot ค้างเดิม ไม่ใช่ regression)
+- **ESLint:** `pricing.js`, `capabilities.js`, `handlers/chatCore/` ผ่าน
+- **Versions:** root + CLI = **0.5.95** (merge พามา); CLI เพิ่ม dependency `confbox`
+- **Install:** สำรอง global + SQLite ที่ `/tmp/9router-before-v0595-20261002/` (0700/0600) → `npm run cli:pack` → `npm install --global ./9router-0.5.95.tgz`
+  → ปิดตัวเดิม → `launchctl kickstart`; รอบนี้รันจาก LaunchAgent (`cli.js --tray --skip-update`, listener PID 24644) `/api/health` = `{"ok":true}`
+- **Live probe (`POST /v1/messages`, ทั้ง `stream:false` และ `true`):** `gcli/grok-4.7`, `cx/gpt-6.1-sol`, `cx/gpt-6-astra-low`, combo `9-deep-reasoner` (→ grok-4.7-xhigh)
+  ได้ `"type":"message"` + SSE ครบ `message_start`→`message_stop`; `usageHistory` บันทึก cost > 0 ทุกแถว (LP-008 ทำงาน)
+  combo `9-fast-worker` (→ antigravity) stream ปกติ แต่ non-stream ได้ chat.completion → ดู **Bug D**
 
 ## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.91 — 2026-09-28
 
@@ -455,6 +509,8 @@ Reference: https://platform.claude.com/docs/en/about-claude/models/extended-thin
 
 **Status:** ACTIVE · **Commits:** `1df544ca`, `99ec5852`, `b6298d96` (+ test `5c34ee8f`) · **Implemented:** 2026-09-28
 
+> **v0.5.95 (2026-10-02):** LP-007 → UPSTREAM_FIXED (`92c7bdd5` เรต gpt-6 ตรงทางการแล้ว); LP-008 KEPT; LP-009 MODIFIED — upstream ใส่เรต gpt-5.6 sol/terra/luna ผิด จึงเก็บเรตเรา และแก้ `cache_creation` เป็นราคา cache write ทางการ (1.25x input: 5.00 / 2.50 / 0.25) ดูตารางรอบ v0.5.95 ด้านบน
+
 **อาการ:** แดชบอร์ด Usage by Model แสดง `gpt-6-astra-medium` / `gpt-6-sol-high` เป็น `$0.00` ทุกคอลัมน์ ทั้งที่ token บันทึกครบ — รวม 16,723 request คิดเงินหายไป ~$2,784
 
 **Root cause:** `getPricingForModel()` คืน `null` แล้ว `usageRepo.calculateCost` เก็บ `cost = 0` ลง DB แบบเงียบๆ เหตุเพราะ
@@ -571,7 +627,7 @@ node scripts/backfill-usage-cost.mjs --provider kimi --model 'k3%' --zero-only
 
 ## LP-014: Codex ปฏิเสธ gpt-6.1-sol เพราะ CLI identity เก่า
 
-**Status:** ACTIVE · **Commits:** `7fd7ee12` (version bump), `d48c12c8` (model + pricing + test) · **Implemented:** 2026-09-30
+**Status:** UPSTREAM_FIXED (v0.5.95: `ca6e8407` identity 0.159.0, `dec820b9` gpt-6.1-sol — ตอน merge ใช้ไฟล์ upstream) · **Commits:** `7fd7ee12` (version bump), `d48c12c8` (model + pricing + test) · **Implemented:** 2026-09-30
 
 **อาการ:** เพิ่ม custom model `gpt-6.1-sol` ในแดชบอร์ดแล้วกด Test ได้
 `HTTP 400: {"detail":"The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account."}`
@@ -624,6 +680,8 @@ cost = `$0.00504200` (prompt 2496 × $2/1M + completion 5 × $10/1M) ตรง�
 ---
 
 ## LP-015: Grok CLI ผ่าน 9Router ได้ HTTP 426 เพราะ CLI identity เก่า (backport จาก upstream)
+
+> **v0.5.95 (2026-10-02):** ปิดแล้ว — `6b9dc54d` มากับ merge `c3deacad` ไม่มี delta เหลือ
 
 **Status:** UPSTREAM_FIXED (backport) · **Commit:** `c85dc41e` (cherry-pick `-x` ของ upstream `6b9dc54d`) · **Applied:** 2026-10-01
 
@@ -710,3 +768,12 @@ chat SSE tool call→tool_use); เทสที่เกี่ยวข้อง
 ### Bug C: grok-cli non-stream บน `/v1/messages` คืน body รูปแบบ OpenAI
 
 **สถานะ:** แก้แล้ว 2026-10-01 → ย้ายไปเป็น **LP-016** (commit `8f7c6cde`) ดูรายละเอียดด้านบน
+
+### Bug D: antigravity non-stream บน `/v1/messages` คืน body รูปแบบ OpenAI
+
+**สถานะ:** NEEDS_REVIEW — พบระหว่าง live probe หลังอัปเดต v0.5.95 (2026-10-02), ยังไม่ได้วิเคราะห์ root cause (นอกขอบเขต upgrade)
+
+- `POST /v1/messages` + `ag/gemini-3.8-flash` (หรือ combo `9-fast-worker` ที่ตกไป antigravity) + `stream:false` → `content-type: application/json`
+  แต่ body เป็น `{"object":"chat.completion","choices":[...]}` แทน `{"type":"message",...}` — อาการเดียวกับ Bug C/LP-016 แต่คนละเส้นทาง (ไม่ใช่ `handleForcedSSEToJson` ของ grok/codex)
+- stream ปกติ → **ไม่กระทบ Claude Code**; กระทบเฉพาะ client non-stream
+- ยังไม่ได้เทียบกับ v0.5.91 / upstream เปล่า — ตรวจก่อนแก้ (อาจเป็น CASE A); ดู LP-016 เป็นแนวทาง (`openAICompletionToClaudeMessage`)

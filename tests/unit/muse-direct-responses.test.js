@@ -106,3 +106,22 @@ describe("muse direct provider tool schema depth", () => {
     expect(depthOf(tool.parameters)).toBeLessThanOrEqual(11);
   });
 });
+
+describe("muse direct provider effort levels", () => {
+  // Meta accepts minimal..max and rejects "none"; the openai default capped
+  // (max) to xhigh. (LP-019)
+  it("publishes Meta's level set for muse-spark", async () => {
+    const { getThinkingLevels } = await import("../../open-sse/providers/thinkingLevels.js");
+    expect(getThinkingLevels("muse", MODEL)).toEqual(["minimal", "low", "medium", "high", "xhigh", "max"]);
+  });
+
+  it("sends (max) as reasoning.effort max", async () => {
+    const wire = await captureWire({ endpoint: "/v1/messages", body: claudeBody(`${MODEL}(max)`), model: `${MODEL}(max)` });
+    expect(wire.body.reasoning).toMatchObject({ effort: "max" });
+  });
+
+  it("leaves opencode-go's muse-spark levels unchanged", async () => {
+    const { getThinkingLevels } = await import("../../open-sse/providers/thinkingLevels.js");
+    expect(getThinkingLevels("opencode-go", MODEL)).toEqual(["none", "minimal", "low", "medium", "high", "xhigh"]);
+  });
+});

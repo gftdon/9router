@@ -54,6 +54,9 @@ const PATTERN_THINKING = [
   // all 200 via output_config.effort; "none" is a 400 on the anthropic route
   // (disable thinking instead). none kept for the picker = disable.
   { pattern: "*deepseek-v4.*", levels: ["none", "low", "medium", "high", "xhigh", "max"] },
+  // Muse Spark on the direct Meta API (probed live 2026-10-02): effort
+  // minimal|low|medium|high|xhigh|max; "none" is rejected with HTTP 400. (LP-019)
+  { provider: "muse", pattern: "muse-spark*", levels: ["minimal", "low", "medium", "high", "xhigh", "max"] },
   // codebuddy-cn per-model effort sets — the server's product-config payload
   // publishes `reasoning.supportedEfforts` per model. NOTE: the chat endpoint
   // accepts any level you send (probed none/minimal/low/medium/high/xhigh/max

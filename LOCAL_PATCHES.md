@@ -9,10 +9,10 @@
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
 | `origin/master` (`gftdon/9router`) | push ครบถึง LP-025 + เอกสาร |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `09c1e5a9` (LP-017..LP-026) |
-| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `09c1e5a9`, deploy LP-026 2026-10-03 01:5x) — request logs **ปิด**; **ไม่ได้**รันจาก LaunchAgent / ttys006 (ตัวที่ผู้ใช้เปิดใน ttys006 ถูกปิดตอน deploy) |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `d58788ff` (LP-017..LP-027) |
+| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `d58788ff`, deploy LP-027 2026-10-03 02:0x) — request logs **ปิด**; ตัวที่ผู้ใช้เปิดใน ttys006 ถูกปิดตอน deploy |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
-| ค้างตรวจ | `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh; `glm/glm-5.3` ติดโควตา 5 ชม. ของบัญชี (ไม่ใช่โค้ด) ตอนทดสอบ 2026-10-03 |
+| ค้างตรวจ | client `/v1/responses` (Codex CLI / Responses SDK): `muse/…(effort)` 400 `unknown parameter reasoning_effort` เมื่อ `input` เป็น string; `muse/…` non-stream ได้ SSE; `ocg/` model ที่เป็น Responses-only non-stream ได้ chat.completion ว่าง (พบ 2026-10-03 ตอนยืนยัน LP-027, ยังไม่วิเคราะห์) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `d58788ff` | `open-sse/providers/thinkingLevels.js` | LP-027: ระดับ effort ของ muse-spark บน `opencode-go` = minimal…max (เดิม `ocg/…(max)` ถูกตัดเหลือ xhigh) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `09c1e5a9` | `open-sse/translator/formats/gemini.js`, `concerns/schemaPlaceholder.js`, `response/gemini-to-openai.js`, `chatCore/nonStreamingHandler.js`, `utils/stream.js`, `executors/antigravity.js` | LP-026 (เดิม Bug A): placeholder `reason` ของ schema ว่างเป็น optional + ตัดออกจาก tool call ที่ส่งกลับ client | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `1df544ca` | `open-sse/providers/pricing.js` | LP-007: เรตตระกูล gpt-6 ตามราคาทางการ OpenAI | UPSTREAM_FIXED (`92c7bdd5`, v0.5.95) |
 | `99ec5852` | `open-sse/providers/pricing.js` | LP-008: resolve ราคาเมื่อ model id มี effort suffix | ACTIVE / KEPT (v0.5.95) |
@@ -1019,6 +1020,28 @@ full suite เทียบรายข้อ: ไม่มี fail ใหม่ 
 Claude Code จริง `9-haiku-level` เรียก `TaskList` 3/3 ได้ `{}` → `No tasks found` ไม่มี error
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เปลี่ยน placeholder (ชื่อ/required) หรือเพิ่มการ strip เอง → เทียบ `addPlaceholders` แล้วประเมิน UPSTREAM_FIXED
+
+---
+
+## LP-027: `ocg/muse-spark…(max)` ถูกตัดเหลือ xhigh
+
+**Status:** ACTIVE · **Commit:** `d58788ff` · **Implemented:** 2026-10-03 · **ต่อยอด:** LP-019 (ตัวเดียวกันบน provider `muse` ตรง)
+
+**Root cause:** `getThinkingLevels("opencode-go", "muse-spark-…")` ไม่ตรงกฎ `{ provider: "muse", pattern: "muse-spark*" }` ของ LP-019 จึงตกไปใช้ค่ากลาง `openai`
+(`none…xhigh` ไม่มี `max`) → `thinkingUnified.js` clamp `(max)` เป็น `xhigh` ก่อนส่งออก
+
+**Probe ตรง `https://opencode.ai/zen/go/v1/responses` (2026-10-03, header `x-opencode-session` + UA `opencode/1.18.31` แบบ executor):**
+`xhigh` 2/2 completed · `max` 3/5 completed (echo `"effort":"max"`, ตอบถูก, 3–41 s), 2/5 = 503 `service_overloaded` (ชั่วคราว; request ที่ไม่ใส่ effort ก็เคยได้ 504)
+· `bogus` → 400 `expected one of none, minimal, low, medium, high, xhigh, max` · `none` → 400 `'none' is not supported for model 'muse-spark-1.3-contributor'`
+
+**วิธีแก้:** เพิ่ม `{ provider: "opencode-go", pattern: "muse-spark*", levels: ["minimal", "low", "medium", "high", "xhigh", "max"] }`
+
+**Validation:** `muse-direct-responses` — เทสของ LP-019 ที่ยืนยันว่า opencode-go "unchanged" เปลี่ยนเป็นชุด minimal…max + เทส wire ใหม่ `ocg (max)` → `/zen/go/v1/responses` `reasoning.effort:"max"`
+(2 ข้อแดงเมื่อไม่มี fix); full suite เทียบรายข้อ: ไม่มี fail ใหม่
+**Deploy + live (2026-10-03 02:0x):** สำรองที่ `/tmp/9router-before-lp027-20261003/` → ปิด server ที่ผู้ใช้เปิดใน ttys006 → ติดตั้ง build `d58788ff` → nohup (logs ปิด)
+→ `/v1/responses` stream `ocg/muse-spark-1.3-contributor(max)`: `response.completed` echo `reasoning:{effort:"max"}` ✅; `/v1/messages` `(max)` และ `(xhigh)` 200 ตอบถูก
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เพิ่มระดับ muse-spark ของ opencode-go เอง → UPSTREAM_FIXED
 
 ---
 

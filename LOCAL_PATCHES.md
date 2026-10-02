@@ -10,8 +10,8 @@
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
 | `origin/master` (`gftdon/9router`) | push ครบถึง LP-025 + เอกสาร |
 | Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `a5027546` (LP-017..LP-025) |
-| Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`, ตั้งแต่ deploy LP-024/LP-025 `a5027546` 2026-10-03 01:2x) — **ไม่ได้**รันจาก LaunchAgent / ttys006 |
-| Request logs | เปิดอยู่ → `~/.local/lib/node_modules/9router/app/logs/` เก็บ `x-api-key` แบบ plaintext — ปิดและลบเมื่อดีบักเสร็จ |
+| Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `a5027546`) — **ปิด request logs แล้ว** ตั้งแต่ 2026-10-03 01:3x; **ไม่ได้**รันจาก LaunchAgent / ttys006 |
+| Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | Bug A (gemini `reason`), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh; `glm/glm-5.3` ติดโควตา 5 ชม. ของบัญชี (ไม่ใช่โค้ด) ตอนทดสอบ 2026-10-03 |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 

@@ -13,6 +13,7 @@
 | Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`) — **ไม่ได้**รันจาก LaunchAgent / terminal |
 | Request logs | เปิดอยู่ → `~/.local/lib/node_modules/9router/app/logs/` เก็บ `x-api-key` แบบ plaintext — ปิดและลบเมื่อดีบักเสร็จ |
 | ค้างตรวจ | Bug A (gemini `reason`), Bug D (antigravity non-stream), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh |
+| รอ deploy | LP-021 (`2735ef3a`) — commit แล้ว ยังไม่ได้ build/ติดตั้ง |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
 
@@ -41,6 +42,7 @@
 | `d0da91c0` | `open-sse/executors/muse.js` | LP-013 (ขยาย): จำกัดความลึก tool schema ให้ provider `muse` ตรงด้วย | ACTIVE |
 | `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE |
 | `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | ACTIVE |
+| `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (ยังไม่ deploy) |
 | — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -822,6 +824,32 @@ Claude stream + tool ได้ SSE ครบ `message_start`→`message_stop` �
 request log ยืนยัน wire = `https://api.meta.ai/v1/responses`, `reasoning: {effort: "max", summary: "auto"}`, ไม่มี `reasoning_effort`
 
 **Push (2026-10-02):** `origin/master` (`gftdon/9router`) `d3053f85..2b5bcbac` — 8 commits (LP-017..LP-020 + test `dc84b0ab` + docs) push ปกติ ไม่ force
+
+## LP-021: Claude 400 `Invalid signature in thinking block` ใน session ของ combo ที่เคยตกไปโมเดลอื่น
+
+**Status:** ACTIVE (commit แล้ว ยังไม่ deploy) · **Commit:** `2735ef3a` · **Implemented:** 2026-10-02 · **ต่อยอดจาก:** LP-003 (`b35cdcac`)
+
+**พบจาก:** ตรวจ request log หลังเปิด `ENABLE_REQUEST_LOGS` (20:50–21:40, 116 request) — error จริงครั้งเดียว 21:03:41
+combo `9-orchestrator` → `cc/claude-opus-5-5(medium)` ได้ `400 invalid_request_error: messages.3.content.0: Invalid \`signature\` in \`thinking\` block`
+(session 185 messages; Claude Code ส่งซ้ำ 1 วินาทีต่อมาแล้วผ่าน → เสีย 1 รอบ แต่เกิดซ้ำได้ทุก session แบบเดียวกัน)
+
+**Root cause:** `9-orchestrator` = claude → kimi → gpt-6-astra; เทิร์นที่ kimi/gpt ตอบถูก Claude Code เก็บเป็น thinking block ที่ `signature: ""`
+(ใน session นั้นมี 13 block ทั้งหมดเป็น signature ว่าง ที่ messages 3…169) LP-003 เลิกทิ้ง thinking block ทั้งหมดและ "ปล่อยให้ Anthropic ตรวจเอง"
+เพื่อไม่ให้ prefix heuristic ทิ้ง signature แบบใหม่ (`CAIS…`) → block ที่ signature ว่างจึงหลุดไป Anthropic ด้วย
+
+**วิธีแก้:** `normalizeClaudePassthrough` step 5 ทิ้งเพิ่มเฉพาะ `thinking` ที่ไม่มี `signature` หรือเป็น `""` และ `redacted_thinking` ที่ไม่มี `data`
+(`isUnsignedThinking`) — signature ที่มีค่าใดๆ ยังส่งต่อแบบ opaque ตาม LP-003 ไม่ใช้ prefix heuristic
+turn ที่ว่างหลังทิ้งจะถูกขั้นถัดไปของ upstream ลบทั้ง message เหมือนกรณี foreign `server_tool_use`
+(ลองใส่ guard "ไม่ให้ turn ว่าง" ในรอบแรกแล้วชน `claude-foreign-server-tool-use` test ของ upstream จึงเอาออก)
+
+**Validation (2026-10-02):** `claude-native-thinking` 12/12 (เพิ่ม 2: ทิ้ง unsigned/คง opaque ตามลำดับ, turn ว่างถูกลบ) — เทสใหม่แดงเมื่อไม่มี fix;
+`claude-foreign-server-tool-use` ผ่าน; full suite 106 failed เท่าเดิมทุก assertion; eslint ผ่าน
+**Replay request จริง (21:03:41) ผ่านโค้ดใหม่:** thinking block 13 → 0, ไม่มี assistant turn ว่าง, ไม่มี block ไหนอยู่ใน assistant turn ล่าสุด (index 183)
+— ยังไม่ได้ยิง Anthropic จริงหลังแก้ (รอ deploy)
+
+**⚠️ เช็คตอน upgrade รอบหน้า:**
+- ถ้า upstream แก้ step 5 ของ `normalizeClaudePassthrough` (กลับไปใช้ `isValidClaudeSignature` หรือ placeholder) ให้ทบทวน LP-003 + LP-021 พร้อมกัน
+- ข้อจำกัด: ถ้า assistant turn **ล่าสุด** ของ tool loop มีแต่ thinking ที่ signature ว่าง แล้วเปิด thinking อยู่ Anthropic อาจตอบว่าต้องมี thinking block แทน — ยังไม่เจอใน log
 
 ---
 

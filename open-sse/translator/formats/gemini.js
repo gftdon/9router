@@ -1,6 +1,7 @@
 // Gemini helper functions for translator
 
 import { safeParseJSON } from "../concerns/json.js";
+import { schemaPlaceholderProperties } from "../concerns/schemaPlaceholder.js";
 import { OPENAI_BLOCK } from "../schema/index.js";
 
 // Unsupported JSON Schema constraints that should be removed for Antigravity
@@ -409,27 +410,17 @@ export function cleanJSONSchemaForAntigravity(schema) {
     if (!obj || typeof obj !== "object") return;
 
     // Empty schema {} (no type, no properties) after $ref removal — treat as object with placeholder
+    // LP-026: placeholder stays optional (not required) and is stripped from replies
     if (Object.keys(obj).length === 0) {
       obj.type = "object";
-      obj.properties = {
-        reason: {
-          type: "string",
-          description: "Brief explanation of why you are calling this tool"
-        }
-      };
-      obj.required = ["reason"];
+      obj.properties = schemaPlaceholderProperties();
       return;
     }
 
     if (obj.type === "object") {
       if (!obj.properties || Object.keys(obj.properties).length === 0) {
-        obj.properties = {
-          reason: {
-            type: "string",
-            description: "Brief explanation of why you are calling this tool"
-          }
-        };
-        obj.required = ["reason"];
+        obj.properties = schemaPlaceholderProperties();
+        delete obj.required;
       }
     }
 

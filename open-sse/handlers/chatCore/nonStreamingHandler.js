@@ -13,6 +13,7 @@ import { appendRequestLog, saveRequestDetail } from "@/lib/usageDb.js";
 import { decloakToolNames } from "../../utils/claudeCloaking.js";
 import { restoreToolNames } from "../../utils/opencodeFingerprint.js";
 import { ROLE, RESPONSES_ITEM } from "../../translator/schema/index.js";
+import { buildClientToolSchemas, stripToolCallPlaceholder } from "../../translator/concerns/schemaPlaceholder.js";
 
 /**
  * Convert an OpenAI Chat Completions non-streaming response body into the
@@ -98,15 +99,15 @@ function openAICompletionToResponses(responseBody, customToolNames = null) {
  * a Claude (/v1/messages) or Responses client behind a Gemini/Antigravity,
  * Claude or Ollama target got that chat.completion verbatim. Finish the hop.
  */
-export function translateNonStreamingResponse(responseBody, targetFormat, sourceFormat, customToolNames = null) {
-  const translated = translateProviderBodyToOpenAI(responseBody, targetFormat, sourceFormat, customToolNames);
+export function translateNonStreamingResponse(responseBody, targetFormat, sourceFormat, customToolNames = null, clientToolSchemas = null) {
+  const translated = translateProviderBodyToOpenAI(responseBody, targetFormat, sourceFormat, customToolNames, clientToolSchemas);
   if (targetFormat === sourceFormat || targetFormat === FORMATS.OPENAI || !translated?.choices) return translated;
   if (sourceFormat === FORMATS.CLAUDE) return openAICompletionToClaudeMessage(translated);
   if (sourceFormat === FORMATS.OPENAI_RESPONSES) return openAICompletionToResponses(translated, customToolNames);
   return translated;
 }
 
-function translateProviderBodyToOpenAI(responseBody, targetFormat, sourceFormat, customToolNames = null) {
+function translateProviderBodyToOpenAI(responseBody, targetFormat, sourceFormat, customToolNames = null, clientToolSchemas = null) {
   if (targetFormat === sourceFormat) return responseBody;
   // Provider responded in OpenAI Chat Completions shape but the client speaks
   // Responses API — convert so tool_calls/text surface as Responses `output`.
@@ -137,7 +138,7 @@ function translateProviderBodyToOpenAI(responseBody, targetFormat, sourceFormat,
           toolCalls.push({
             id: `call_${part.functionCall.name}_${Date.now()}_${toolCalls.length}`,
             type: "function",
-            function: { name: part.functionCall.name, arguments: JSON.stringify(part.functionCall.args || {}) }
+            function: { name: part.functionCall.name, arguments: JSON.stringify(stripToolCallPlaceholder(part.functionCall.name, part.functionCall.args || {}, clientToolSchemas)) }
           });
         }
         // Handle inline image data (from image generation models)
@@ -292,7 +293,7 @@ export async function handleNonStreamingResponse({ providerResponse, provider, m
   if (log?.line) log.line(reqTag, "📊", formatDoneLine({ usage, latency: { total: Date.now() - requestStartTime } }));
 
   const translatedResponse = needsTranslation(targetFormat, sourceFormat)
-    ? translateNonStreamingResponse(responseBody, targetFormat, sourceFormat, customToolNames)
+    ? translateNonStreamingResponse(responseBody, targetFormat, sourceFormat, customToolNames, buildClientToolSchemas(body?.tools))
     : responseBody;
   const isClaudeMessageResponse = sourceFormat === FORMATS.CLAUDE && translatedResponse?.type === "message";
   // Responses-format translation produces a `object:"response"` body with no

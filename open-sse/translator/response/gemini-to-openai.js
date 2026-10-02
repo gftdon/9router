@@ -7,6 +7,7 @@ import { reasoningDelta } from "../concerns/reasoning.js";
 import { encodeDataUri } from "../concerns/image.js";
 import { toOpenAIFinish } from "../concerns/finishReason.js";
 import { storeGeminiThoughtSignature } from "../../services/thoughtSignatureStore.js";
+import { stripToolCallPlaceholder } from "../concerns/schemaPlaceholder.js";
 
 // Build chunk meta for current gemini state
 function chunkMeta(state) {
@@ -18,7 +19,7 @@ function emitFunctionCall(functionCall, state, signature = null) {
   const rawName = functionCall.name;
   // Restore original tool name from mapping (AG cloaking)
   const fcName = state.toolNameMap?.get(rawName) || rawName;
-  const fcArgs = functionCall.args || {};
+  const fcArgs = stripToolCallPlaceholder(fcName, functionCall.args || {}, state.clientToolSchemas);
   const toolCallIndex = state.functionIndex++;
   const callId = functionCall.id || `${fcName}-${Date.now()}-${toolCallIndex}`;
   if (signature) {

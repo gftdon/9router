@@ -85,3 +85,24 @@ describe("muse direct provider reasoning effort", () => {
     expect(wire.body.reasoning).toMatchObject({ effort: "low" });
   });
 });
+
+describe("muse direct provider tool schema depth", () => {
+  // Meta: HTTP 400 "JSON schema exceeds the maximum nesting depth of 10 levels". (LP-013)
+  const deep = (n) => (n ? { type: "object", properties: { x: deep(n - 1) } } : { type: "string" });
+  const depthOf = (node) => {
+    if (!node || typeof node !== "object") return 0;
+    const children = Object.values(node).filter((v) => v && typeof v === "object");
+    return 1 + (children.length ? Math.max(...children.map(depthOf)) : 0);
+  };
+
+  it("caps a Claude client's deep tool schema to Meta's nesting limit", async () => {
+    const body = {
+      ...claudeBody(),
+      tools: [{ name: "Deep", description: "deep", input_schema: deep(13) }],
+    };
+    const wire = await captureWire({ endpoint: "/v1/messages", body });
+    const tool = wire.body.tools.find((t) => t.name === "Deep");
+    expect(tool).toBeDefined();
+    expect(depthOf(tool.parameters)).toBeLessThanOrEqual(11);
+  });
+});

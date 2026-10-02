@@ -1,4 +1,6 @@
 import { DefaultExecutor } from "./default.js";
+import { isMuseSparkModel } from "../providers/models/helpers.js";
+import { capToolSchemasDepth } from "../utils/museSparkToolSchema.js";
 
 // Muse (Meta Model API). Every model is pinned to /v1/responses, which rejects
 // the Chat-style top-level `reasoning_effort` with HTTP 400 "unknown parameter"
@@ -19,6 +21,8 @@ export class MuseExecutor extends DefaultExecutor {
       if (!out.reasoning.summary) out.reasoning.summary = "auto";
     }
     delete out.reasoning_effort;
+    // Muse Spark 400s any tool schema nested past 10 levels (LP-013).
+    if (isMuseSparkModel(model || out.model)) capToolSchemasDepth(out.tools);
     return out;
   }
 }

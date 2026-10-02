@@ -18,12 +18,12 @@ vi.mock("@/lib/usageDb.js", () => ({
 
 const MODEL = "muse-spark-1.3-contributor";
 
-async function captureWire({ endpoint, body, model = MODEL }) {
+async function captureWire({ endpoint, body, model = MODEL, provider = "muse", credentials = { accessToken: "test-token", providerSpecificData: {} } }) {
   const { handleChatCore } = await import("../../open-sse/handlers/chatCore.js");
   await handleChatCore({
     body: structuredClone(body),
-    modelInfo: { provider: "muse", model },
-    credentials: { accessToken: "test-token", providerSpecificData: {} },
+    modelInfo: { provider, model },
+    credentials,
     clientRawRequest: { endpoint, body, headers: {} },
     // /v1/messages pins the source format in the real route; mirror it.
     sourceFormatOverride: endpoint === "/v1/messages" ? "claude" : undefined,
@@ -121,9 +121,23 @@ describe("muse direct provider effort levels", () => {
     expect(wire.body.reasoning).toMatchObject({ effort: "max" });
   });
 
-  it("leaves opencode-go's muse-spark levels unchanged", async () => {
+  // OpenCode Go serves the same model and lists the same set (probed live
+  // 2026-10-03); its openai default used to cap (max) to xhigh too. (LP-027)
+  it("publishes the same level set for opencode-go's muse-spark", async () => {
     const { getThinkingLevels } = await import("../../open-sse/providers/thinkingLevels.js");
-    expect(getThinkingLevels("opencode-go", MODEL)).toEqual(["none", "minimal", "low", "medium", "high", "xhigh"]);
+    expect(getThinkingLevels("opencode-go", MODEL)).toEqual(["minimal", "low", "medium", "high", "xhigh", "max"]);
+  });
+
+  it("sends opencode-go (max) as reasoning.effort max", async () => {
+    const wire = await captureWire({
+      endpoint: "/v1/messages",
+      body: claudeBody(`${MODEL}(max)`),
+      model: `${MODEL}(max)`,
+      provider: "opencode-go",
+      credentials: { apiKey: "test-key", providerSpecificData: {} },
+    });
+    expect(wire.url).toContain("/zen/go/v1/responses");
+    expect(wire.body.reasoning).toMatchObject({ effort: "max" });
   });
 });
 

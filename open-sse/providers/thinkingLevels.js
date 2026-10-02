@@ -57,6 +57,9 @@ const PATTERN_THINKING = [
   // Muse Spark on the direct Meta API (probed live 2026-10-02): effort
   // minimal|low|medium|high|xhigh|max; "none" is rejected with HTTP 400. (LP-019)
   { provider: "muse", pattern: "muse-spark*", levels: ["minimal", "low", "medium", "high", "xhigh", "max"] },
+  // Same model behind OpenCode Go (probed live 2026-10-03): the validator lists
+  // none|minimal|low|medium|high|xhigh|max, "max" completes, "none" is a 400. (LP-027)
+  { provider: "opencode-go", pattern: "muse-spark*", levels: ["minimal", "low", "medium", "high", "xhigh", "max"] },
   // codebuddy-cn per-model effort sets — the server's product-config payload
   // publishes `reasoning.supportedEfforts` per model. NOTE: the chat endpoint
   // accepts any level you send (probed none/minimal/low/medium/high/xhigh/max

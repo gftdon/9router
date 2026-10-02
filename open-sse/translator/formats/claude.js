@@ -223,8 +223,9 @@ export function isInvalidThinkingSignatureError(status, text) {
 }
 
 // Copy of a Claude body with every thinking/redacted_thinking block removed from
-// assistant turns. Thinking is switched off for the retry when the final
-// assistant turn lost its thinking (the API requires one there when enabled),
+// assistant turns. Thinking is switched off for the retry only when the final
+// assistant turn is an open tool loop that lost its thinking (the API requires
+// one there when enabled),
 // together with the clear_thinking context edits that depend on it.
 export function stripThinkingForSignatureRetry(body) {
   if (!body || !Array.isArray(body.messages)) return null;
@@ -238,7 +239,11 @@ export function stripThinkingForSignatureRetry(body) {
     const content = msg.content.filter((b) => !isThinking(b));
     const removed = msg.content.length - content.length;
     stripped += removed;
-    if (removed && i === lastAssistant) lastAssistantLostThinking = true;
+    // Only an open tool loop (last assistant turn ends in tool_use) needs a
+    // leading thinking block; a finished text turn keeps thinking on.
+    if (removed && i === lastAssistant && content.some((b) => b?.type === CLAUDE_BLOCK.TOOL_USE)) {
+      lastAssistantLostThinking = true;
+    }
     if (content.length) messages.push({ ...msg, content });
   });
   if (!stripped) return null;

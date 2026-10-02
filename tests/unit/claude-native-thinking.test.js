@@ -200,6 +200,9 @@ describe("Claude Code native combo thinking round-trip", () => {
       expect(bodies[0].messages[1].content.some(isThinking)).toBe(true);
       expect(bodies[1].messages[1].content.some(isThinking)).toBe(false);
       expect(bodies[1].messages[1].content.map((b) => b.type)).toEqual(["text"]);
+      // A finished text turn needs no leading thinking: keep thinking on.
+      expect(bodies[1].thinking).toEqual({ type: "enabled", budget_tokens: 2048 });
+      expect(bodies[1].context_management?.edits?.map((e) => e.type)).toContain("clear_thinking_20251015");
     });
 
     it("turns thinking off when the current tool loop lost its thinking", async () => {

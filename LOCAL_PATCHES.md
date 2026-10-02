@@ -3,16 +3,16 @@
 > เอกสารนี้บันทึก patch ที่เราแก้เองบน fork (`gftdon/9router`) แต่ยังไม่ได้ขึ้น upstream (`decolua/9router`)
 > **ทุกครั้งที่อัปเดต 9router เวอร์ชันใหม่ ให้เช็คไฟล์นี้ก่อน** — ถ้า patch ถูกเขียนทับ ให้ re-apply ตามขั้นตอนด้านล่างของแต่ละเคส
 
-## สถานะปัจจุบัน (อัปเดต 2026-10-02)
+## สถานะปัจจุบัน (อัปเดต 2026-10-03)
 
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-022 + เอกสาร |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `4e8d2f28` (LP-017..LP-022) |
-| Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`, ตั้งแต่ deploy LP-022 `4e8d2f28` 2026-10-03) — **ไม่ได้**รันจาก LaunchAgent / ttys006 |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-023 + เอกสาร |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `0a8e550c` (LP-017..LP-023) |
+| Server ที่รันอยู่ | `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` (nohup, `/tmp/9router.log`, ตั้งแต่ deploy LP-023 `0a8e550c` 2026-10-03 00:5x) — **ไม่ได้**รันจาก LaunchAgent / ttys006 |
 | Request logs | เปิดอยู่ → `~/.local/lib/node_modules/9router/app/logs/` เก็บ `x-api-key` แบบ plaintext — ปิดและลบเมื่อดีบักเสร็จ |
-| ค้างตรวจ | Bug A (gemini `reason`), Bug D (antigravity non-stream), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh |
+| ค้างตรวจ | Bug A (gemini `reason`), Bug D (antigravity non-stream), `ocg/muse-spark…(max)` ยังถูกตัดเป็น xhigh; `glm/glm-5.3` ติดโควตา 5 ชม. ของบัญชี (ไม่ใช่โค้ด) ตอนทดสอบ 2026-10-03 |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
@@ -44,6 +44,7 @@
 | `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | ACTIVE |
 | `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy + ยืนยัน live แล้ว; ไม่ครอบคลุม signature ของ kimi → LP-022) |
 | `5c96c99e`, `4e8d2f28` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (deploy + ยืนยัน live ทั้ง 2 commit) |
+| `0a8e550c` | `open-sse/utils/stream.js`, `open-sse/handlers/chatCore/streamingHandler.js` | LP-023: stream Claude→Claude (passthrough) ถอดชื่อ tool ที่ถูก cloak (`_ide`) กลับ | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | — | antigravity non-stream response | Bug D: `/v1/messages` + `stream:false` ผ่าน antigravity คืน chat.completion (ยังไม่ได้แก้) | NEEDS_REVIEW |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
@@ -906,6 +907,33 @@ C: request log `4_req_target.json` = assistant `text` ไม่มี thinking (
 → replay **A 200, B 200, C 200**; request log ของ C: assistant `text` ไม่มี thinking block และ `thinking: {type: "adaptive"}` **ยังเปิดอยู่** ✅
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** เทียบกับวิธีที่ upstream จัดการ signature ต่างโมเดล; ถ้า upstream เพิ่ม `executor.execute` จุดใหม่ เทส source-scan จะต้องนับใหม่
+
+---
+
+## LP-023: stream Claude→Claude ส่งชื่อ tool ที่ถูก cloak (`calc_ide`) กลับไปให้ client
+
+**Status:** ACTIVE · **Commit:** `0a8e550c` · **Implemented:** 2026-10-03 · **Upstream:** ยังไม่แก้ (`upstream/master` = v0.5.95 ตอนตรวจ)
+
+**อาการ (เจอจากทดสอบสลับโมเดลทุกตัวใน combo 2026-10-03):** client รูปแบบ Claude ที่**ไม่ใช่** Claude Code ตัวจริง (curl, tool อื่น) เรียก `cc/...` ด้วย OAuth token แบบ `stream:true` พร้อม tools
+→ ได้ `tool_use.name = "calc_ide"` แทน `"calc"`; ส่ง history กลับไปก็ถูก cloak ซ้ำเป็น `calc_ide_ide` (โมเดลบอกเองว่า "เรียกผิดชื่อเป็น calc_ide_ide") — `stream:false` ปกติ
+Claude Code ตัวจริง**ไม่โดน** เพราะเข้า native passthrough ที่ไม่ cloak tool
+
+**Root cause:** `translateRequest` cloak ชื่อ tool (`cloakToolsOnOAuth` + `sk-ant-oat`) แม้ source = target = claude
+แต่ `buildTransformStream` (`streamingHandler.js`) เลือก `createPassthroughStreamWithLogger` เมื่อไม่ต้อง translate ซึ่ง**ไม่ได้รับ `toolNameMap` และไม่เรียก `translateResponse()`**
+→ ทางถอดชื่อที่ upstream ใส่ไว้ใน same-format branch ของ `translateResponse` (`decloakStreamChunk`, #4342) ไม่เคยทำงานบน stream จริง
+(เทส upstream `claude-claude-stream-decloak` เรียก `translateResponse` ตรงๆ จึงไม่จับ)
+
+**วิธีแก้:** ส่ง `toolNameMap` เข้า passthrough stream (พารามิเตอร์ท้ายของ `createPassthroughStreamWithLogger`) และเมื่อ map ไม่ว่าง
+ใช้ `restoreToolNames(decloakStreamChunk(...))` กับแต่ละ SSE event ตัวเดียวกับ same-format branch — ไม่มี map (native passthrough) = ไม่แตะ จึงไม่ตัด `_ide` ของ tool จริงของผู้ใช้
+
+**Validation (2026-10-03):** เทสใหม่ `tests/unit/claude-passthrough-stream-decloak.test.js` 3 ข้อ (ส่ง SSE ผ่าน stream จริง) — 2 ข้อแดงเมื่อไม่มี fix;
+full suite เทียบรายข้อกับก่อนแก้: ไม่มี fail ใหม่ (102 → 100 = 2 ข้อของ LP-023)
+**Deploy + live (2026-10-03 00:5x):** สำรองที่ `/tmp/9router-before-lp023-20261003/` (ไม่รวม logs) → ลบ request logs เก่า → ปิด launcher/server (เดิมรันที่ ttys006)
+→ ติดตั้ง → เปิด `ENABLE_REQUEST_LOGS=true 9router --tray --skip-update` แบบ nohup (`/tmp/9router.log`)
+→ chain สลับทุกโมเดล 10 เทิร์น + chain combo 7 เทิร์น (stream, tool + thinking): ทุกเทิร์น 200, `cc/` คืน `calc` ✅;
+request log: `4_req_target` ยังเป็น `calc_ide` (cloak ทำงานตามเดิม) แต่ `7_res_client` ไม่มี `calc_ide` เลย; Claude Code จริง (`9-orchestrator` + Read) ปกติ
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream ส่ง `toolNameMap` เข้า passthrough stream หรือเปลี่ยนให้ same-format ไปทาง translate stream → ประเมินเป็น UPSTREAM_FIXED
 
 ---
 

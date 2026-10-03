@@ -1134,6 +1134,7 @@ Rollback: `npm install --global` ทับด้วยของใน backup (�
 **⚠️ เช็คตอน upgrade รอบหน้า:** ไฟล์ upstream ที่แตะ (แก้ 1–3 บรรทัด/ไฟล์): `chatCore.js` (churn สูงสุด), handler ทั้ง 3, `requestDetail.js` (`saveUsageStats`), `usageRepo.js` (INSERT), `schema.js`, `sessionManager.js` (export), `usage/page.js` (tab)
 ถ้า conflict: ให้ upstream ชนะแล้วใส่การส่ง `sessionId/clientTool/latency` กลับ · ถ้า upstream `SCHEMA_VERSION` ขยับเอง ให้ใช้ค่าที่สูงกว่า +1 · ถ้า upstream ทำ session tracking เองให้เทียบแล้วพิจารณา UPSTREAM_FIXED
 ตรวจเร็วหลัง upgrade: `cd tests && npx vitest run unit/usage-session.test.js`
+**ค้าง:** ขนาด `usageHistory` โตไม่มีเพดาน → ดู "TODO (ต่อจาก LP-032)" ในหัวข้อ Patch ที่ยังไม่ได้แก้
 **ปรับ UI (`a4a1c08e`, 2026-10-03):** Drawer Session Details กว้าง 75% ของจอ (`width="full"` + `sm:max-w-[75vw]`; มือถือเต็มจอ) — วัดจริง 1500px→1125px, 1920px→1440px, 390px→390px · แก้เฉพาะ `SessionsTab.js` (deploy 2026-10-03 11:34)
 **จำกัดช่วงข้อมูลที่รวมยอด (`4d4150ce`, 2026-10-03):** `usageHistory` ไม่มีการลบข้อมูลเก่า (upstream ไม่มี retention) → query รวมยอดเดิม GROUP BY ทั้งตารางทุกครั้งที่เปิดหน้า
 วัดบนสำเนา DB ที่ใส่ sessionId ทุกแถว (228K แถว/11 สัปดาห์): 0.28 วิ → คาดราว 3 วิ/query ที่ 1 ปี (หน้า list รัน 2 query)
@@ -1200,6 +1201,26 @@ Rollback: `cp ~/.9router/com.9router.autostart.plist.bak-20261003 ~/Library/Laun
 ---
 
 ## Patch ที่ยังไม่ได้แก้ (รอตัดสินใจ)
+
+### TODO (ต่อจาก LP-032): ขนาด `usageHistory` โตไม่มีเพดาน — ทบทวนราว ม.ค.–ก.พ. 2027
+
+**สถานะ:** ยังไม่ทำ (ผู้ใช้ขอให้จดไว้ก่อน 2026-10-03) · ทำไปแล้วเฉพาะเรื่อง**ความเร็ว** (`4d4150ce` จำกัดช่วงวันที่ก่อนรวมยอด) — **ขนาด DB ยังไม่ได้แก้**
+
+**ตัวเลขตอนจด (2026-10-03):** `data.sqlite` 144 MB · `usageHistory` 228K แถว (เริ่ม 2026-07-15) · ราว 6,300 แถว/วัน
+- upstream เอง: ~460 bytes/แถว (ข้อมูล + index) ≈ 2.9 MB/วัน ≈ 1 GB/ปี — **upstream ไม่มี retention เลย** (ไม่มี `DELETE FROM usageHistory` ที่ไหน)
+- ส่วนที่ LP-032 เพิ่ม (`sessionId` + `meta` + `idx_uh_session`): ~155 bytes/แถว ≈ 1 MB/วัน ≈ 370 MB/ปี (+34%)
+
+**ทางเลือกที่ยังไม่ได้ทำ:**
+1. **Partial index** — `idx_uh_session` ตอนนี้ 7.5 MB ทั้งที่มีแถวที่มี sessionId แค่หลักร้อย เพราะแถว NULL (ข้อมูลก่อน LP-032) ถูก index ด้วย
+   แก้: `CREATE INDEX … ON usageHistory(sessionId, timestamp) WHERE sessionId IS NOT NULL` — ต้องแตะ `src/lib/db/schema.js` (ไฟล์ upstream) + drop index เดิม
+   ประโยชน์ลดลงเรื่อยๆ เพราะแถวใหม่มี sessionId เกือบทั้งหมด → คุ้มเฉพาะถ้าอยากคืนพื้นที่ส่วน NULL
+2. **Retention** (แก้ที่ต้นเหตุ) — ลบ/ย้ายแถว `usageHistory` เก่ากว่า N เดือน (เช่น 12) ด้วย job แยก
+   ⚠️ กระทบของ upstream: แท็บ Overview/Details, `scripts/backfill-usage-cost.mjs` (LP-012) และยอดย้อนหลัง — ต้องเช็คก่อนว่า Overview อ่าน `usageDaily` (ยอดรวมรายวัน) หรือ `usageHistory` ช่วงไหน
+   ทางที่ปลอดภัยกว่า: archive ไปไฟล์ SQLite แยกก่อนลบ · ต้อง `VACUUM` หลังลบถึงจะคืนพื้นที่ไฟล์ (ทำตอน gateway หยุด)
+3. ถ้า upstream เพิ่ม retention / ลบข้อมูลเก่าเอง → เทียบแล้วปิด TODO นี้
+
+**ตอนกลับมาทำ:** วัดใหม่ก่อน — `du -h ~/.9router/db/data.sqlite` และ `sqlite3 -readonly ~/.9router/db/data.sqlite "select name, sum(pgsize)/1048576.0 from dbstat group by name order by 2 desc limit 8;"`
+ความเร็วแท็บ Sessions ไม่ต้องห่วงแล้ว (คงที่ ~0.2 วิ ตามช่วง 30 วัน) — เรื่องนี้เป็นเรื่องพื้นที่ดิสก์อย่างเดียว
 
 ### Bug A → แก้แล้วเป็น LP-026 (ดูหัวข้อ LP-026 ด้านบน) — บันทึกเดิม:
 

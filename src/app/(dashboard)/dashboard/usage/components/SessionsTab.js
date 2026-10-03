@@ -314,7 +314,7 @@ export default function SessionsTab() {
         )}
       </Card>
 
-      <Drawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} title="Session Details" width="xl">
+      <Drawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} title="Session Details" width="full" className="sm:max-w-[75vw]">
         {breakdownLoading && (
           <div className="flex items-center justify-center gap-2 p-8 text-text-muted">
             <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>

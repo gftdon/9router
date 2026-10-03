@@ -97,6 +97,18 @@ function CopyButton({ text }) {
   );
 }
 
+// Default window keeps the aggregate bounded as usageHistory grows (it is never pruned).
+// Clearing Start Date by hand still shows all time.
+const DEFAULT_WINDOW_DAYS = 30;
+
+function defaultFilters() {
+  const start = new Date(Date.now() - DEFAULT_WINDOW_DAYS * 86400000);
+  start.setHours(0, 0, 0, 0);
+  const pad = (n) => String(n).padStart(2, "0");
+  const local = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}T00:00`; // datetime-local format
+  return { startDate: local, endDate: "" };
+}
+
 const TH = "px-3 py-4 text-sm font-semibold text-text-main whitespace-nowrap";
 const TD_NUM = "px-3 py-4 text-sm text-text-main text-right font-mono whitespace-nowrap";
 
@@ -104,7 +116,8 @@ export default function SessionsTab() {
   const [sessions, setSessions] = useState([]);
   const [totals, setTotals] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
-  const [filters, setFilters] = useState({ startDate: "", endDate: "" });
+  const [filters, setFilters] = useState(defaultFilters);
+  const [initialFilters] = useState(() => filters);
   const [providerNodes, setProviderNodes] = useState(null);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -165,7 +178,7 @@ export default function SessionsTab() {
   };
 
   const handleClearFilters = () => {
-    setFilters({ startDate: "", endDate: "" });
+    setFilters(initialFilters);
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
@@ -205,10 +218,10 @@ export default function SessionsTab() {
             <Button
               variant="ghost"
               onClick={handleClearFilters}
-              disabled={!filters.startDate && !filters.endDate}
+              disabled={filters.startDate === initialFilters.startDate && filters.endDate === initialFilters.endDate}
               className="w-full"
             >
-              Clear Filters
+              Reset to last {DEFAULT_WINDOW_DAYS} days
             </Button>
           </div>
         </div>

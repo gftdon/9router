@@ -127,4 +127,21 @@ describe.each(DRIVERS)("session usage aggregation ($name driver)", ({ name, mock
     expect(list.sessions.map((s) => s.sessionId)).toEqual(["claude:late"]);
     expect(await sessionUsage.getSessionBreakdown("claude:missing")).toBeNull();
   });
+
+  it("counts a session in full when any request falls in range, and skips sessions with none inside", async () => {
+    // started before the range, still active inside it → all of its rows count
+    await save({ sessionId: "claude:spans", timestamp: "2026-09-01T00:00:00.000Z", tokens: { prompt_tokens: 100, completion_tokens: 10 } });
+    await save({ sessionId: "claude:spans", timestamp: "2026-10-03T00:00:00.000Z", tokens: { prompt_tokens: 200, completion_tokens: 20 } });
+    // brackets the range with no request inside it → excluded
+    await save({ sessionId: "claude:gap", timestamp: "2026-09-30T00:00:00.000Z", tokens: { prompt_tokens: 1, completion_tokens: 1 } });
+    await save({ sessionId: "claude:gap", timestamp: "2026-10-05T00:00:00.000Z", tokens: { prompt_tokens: 1, completion_tokens: 1 } });
+
+    const list = await sessionUsage.listSessions({ startDate: "2026-10-02T00:00:00.000Z", endDate: "2026-10-04T00:00:00.000Z" });
+    expect(list.sessions.map((s) => s.sessionId)).toEqual(["claude:spans"]);
+    expect(list.sessions[0]).toMatchObject({ requests: 2, promptTokens: 300, completionTokens: 30 });
+    expect(list.totals).toMatchObject({ sessions: 1, requests: 2, promptTokens: 300 });
+
+    const all = await sessionUsage.listSessions({});
+    expect(all.totals.sessions).toBe(2);
+  });
 });

@@ -8,17 +8,19 @@ export const MAX_SESSION_ID_LENGTH = 256;
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-// Sessions overlapping [startDate, endDate] — a session counts in full if any of
-// its requests falls inside the range.
-function buildRangeHaving(startDate, endDate) {
-  const conds = [];
+// Sessions with at least one request inside [startDate, endDate] — each counts in
+// full. The range is resolved first through idx_uh_ts so only those sessions get
+// aggregated; without it every page load scans the whole (unbounded) table.
+function buildRangeFilter(startDate, endDate) {
+  const conds = ["sessionId IS NOT NULL"];
   const params = [];
-  if (startDate) { conds.push("MAX(timestamp) >= ?"); params.push(new Date(startDate).toISOString()); }
-  if (endDate) { conds.push("MIN(timestamp) <= ?"); params.push(new Date(endDate).toISOString()); }
-  return { having: conds.length ? `HAVING ${conds.join(" AND ")}` : "", params };
+  if (startDate) { conds.push("timestamp >= ?"); params.push(new Date(startDate).toISOString()); }
+  if (endDate) { conds.push("timestamp <= ?"); params.push(new Date(endDate).toISOString()); }
+  if (!params.length) return { where: "", params };
+  return { where: `AND sessionId IN (SELECT sessionId FROM usageHistory WHERE ${conds.join(" AND ")})`, params };
 }
 
-const SESSION_AGG_SQL = `
+const sessionAggSql = (where) => `
   SELECT sessionId,
          MIN(timestamp) AS firstAt,
          MAX(timestamp) AS lastAt,
@@ -35,7 +37,7 @@ const SESSION_AGG_SQL = `
          SUM(COALESCE(json_extract(meta, '$.latencyMs'), 0)) AS durationMs,
          MAX(json_extract(meta, '$.clientTool')) AS clientTool
   FROM usageHistory
-  WHERE sessionId IS NOT NULL
+  WHERE sessionId IS NOT NULL ${where}
   GROUP BY sessionId`;
 
 // Rows are stamped when a request finishes, so a session starts at its earliest
@@ -65,8 +67,8 @@ function shapeSession(row) {
 
 export async function listSessions({ page = 1, pageSize = 20, startDate, endDate } = {}) {
   const db = await getAdapter();
-  const { having, params } = buildRangeHaving(startDate, endDate);
-  const filtered = `${SESSION_AGG_SQL} ${having}`;
+  const { where, params } = buildRangeFilter(startDate, endDate);
+  const filtered = sessionAggSql(where);
 
   const totalsRow = db.get(
     `SELECT COUNT(*) AS sessions, SUM(requests) AS requests,

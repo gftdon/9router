@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { RequestLogger, CardSkeleton, SegmentedControl } from "@/shared/components";
 import UsageStats from "@/shared/components/UsageStats";
 import RequestDetailsTab from "./components/RequestDetailsTab";
@@ -26,7 +26,6 @@ export default function UsagePage() {
 
 function UsageContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const [period, setPeriod] = useState("today");
 
@@ -39,7 +38,9 @@ function UsageContent() {
     if (value === activeTab) return;
     const params = new URLSearchParams(searchParams);
     params.set("tab", value);
-    router.push(`/dashboard/usage?${params.toString()}`, { scroll: false });
+    // Native history API (synced with useSearchParams): router.push is a no-op when the
+    // page was hard-loaded with ?tab= (static page), which froze the tabs.
+    window.history.pushState(null, "", `/dashboard/usage?${params.toString()}`);
   };
 
   return (

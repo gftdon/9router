@@ -8,7 +8,7 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-031 + เอกสาร |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-031 + เอกสาร — LP-032 (`79698992`) ยังไม่ push |
 | Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `baedc557` (LP-017..LP-031) |
 | Server ที่รันอยู่ | `9router --tray --skip-update` (nohup, `/tmp/9router.log`, build `baedc557`, deploy LP-031 2026-10-03 02:18) — request logs **ปิด** |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (E2E แล้ว ยังไม่ deploy) |
 | `baedc557` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js` | LP-031: Responses upstream ส่ง `event: error` / `response.failed` หลัง HTTP 200 → client non-stream ได้ error (429 สำหรับ rate limit, 502 อื่นๆ) แทน 200 ว่าง เพื่อให้ account/combo fallback | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `df7999a5` | `open-sse/executors/muse.js` | LP-028: ย้าย effort เข้า `reasoning` เมื่อ Responses body มี `input` เป็น string (แก้ LP-018) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `6a389c60` | `open-sse/handlers/chatCore.js` | LP-029: provider ที่ forceStream แต่ตอบ JSON ธรรมดา → ใช้ handler non-stream แทนการห่อ JSON เป็น SSE | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -1094,6 +1095,38 @@ Claude Code จริง `9-haiku-level` เรียก `TaskList` 3/3 ได�
 ครั้ง 5–6 ได้ 503 ระหว่าง cooldown — ไม่มี 200 ว่างอีก
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เพิ่มการจัดการ `error` event ใน `streamToJsonConverter.js` / `sseToJsonHandler.js` เอง → เทียบแล้วตัด patch
+
+---
+
+## LP-032: Session-aware usage — แท็บ Usage › Sessions
+
+**Status:** ACTIVE · **Commit:** `79698992` · **Implemented:** 2026-10-03 · ฟีเจอร์ (ไม่ใช่ bug fix) ตามที่ผู้ใช้ขอ
+
+**เหตุผล:** อยากดูว่า session หนึ่ง (Claude Code main agent + subagent) ใช้ token in/out/cache, ค่าใช้จ่ายแยกตาม model, เวลาที่แต่ละ model ใช้ และเวลารวมของ session เท่าไหร่
+ข้อมูลมีเกือบครบอยู่แล้วใน `usageHistory` ขาดแค่ Session ID — และ `extractClientSessionId` (`open-sse/utils/sessionManager.js`) อ่าน session ของ client ได้อยู่แล้ว (ใช้ทำ prompt-cache / สี log) แต่ไม่เคยถูกบันทึก
+
+**แก้:**
+- `sessionManager.js` export `extractClientSessionId` — ใช้**เฉพาะ id ที่ client ส่งมา** (`claude:<uuid>` จาก `x-claude-code-session-id` / `metadata.user_id`, Antigravity, `x-session-id`, Codex `prompt_cache_key`/`session_id` ฯลฯ) ไม่ใช้ synthetic fallback (assistant-text hash / per-connection) เพราะจะสร้าง session ปลอม
+- `chatCore.js` คำนวณ `usageSessionId` ครั้งเดียว + ใส่ `usageSessionId`, `clientTool` ลง `sharedCtx` → handler ทั้ง 3 (`nonStreaming`, `streaming`, `sseToJson`) ส่ง `sessionId`, `clientTool`, `latency` เข้า `saveUsageStats`
+- `usageRepo.saveRequestUsage` เขียนคอลัมน์ใหม่ `usageHistory.sessionId` + `meta` = `{latencyMs, ttftMs, clientTool}` (เดิม `{}` ทุกแถว) — dedup query ไม่เปลี่ยน
+- `schema.js`: `sessionId TEXT` + `idx_uh_session(sessionId, timestamp)` (additive ผ่าน `syncSchemaFromTables`) · `SCHEMA_VERSION` 1 → 2 (ได้ backup อัตโนมัติ 1 ครั้งก่อนเพิ่มคอลัมน์)
+- ไฟล์ใหม่: `src/lib/usage/sessionUsage.js` (`listSessions` / `getSessionBreakdown`), `src/app/api/usage/sessions/route.js`, `usage/components/SessionsTab.js` + tab entry ใน `usage/page.js`
+- เวลาเริ่ม session = `min(timestamp − latencyMs)` เพราะ row ถูก stamp ตอน request **จบ** · "Model time" = ผลรวม latency (ซ้อนกันได้ถ้า subagent รันขนาน จึงอาจเกิน duration)
+- ไม่แตะ `requestDetails` / แท็บ Details เลย (`usageHistory` ไม่มีเพดาน 1000 แถว → session ยาวก็ครบ)
+
+**ความปลอดภัย:** `/api/usage/sessions` ไม่อยู่ใน `PUBLIC_API_PATHS` → `dashboardGuard` บังคับ login (ทดสอบแล้วได้ 401 ตอนไม่ login) · คืนเฉพาะยอดรวม ไม่มี prompt/response · SQL แบบ parameterized · `sessionId` cap 256 ตัว, `pageSize` 1–100, วันที่ต้อง parse ได้ · session id เป็นตัวระบุ ไม่ใช่ credential
+
+**ข้อจำกัด:** แถวเก่าก่อน LP-032 มี `sessionId = NULL` → ไม่แสดงในแท็บ (ไม่ backfill) · request ที่ client ไม่ส่ง session id ก็ไม่แสดง (ยังอยู่ใน Overview/Details ตามเดิม)
+
+**Tests:** `tests/unit/usage-session.test.js` 10 ข้อ — `extractClientSessionId` (header, `metadata.user_id` ทั้ง 2 รูปแบบ, ไม่มี id → null) + การรวมยอดต่อ session/ต่อ model, เวลาเริ่ม/wall-clock, กรองช่วงวันที่, ไม่รวมแถว NULL — รันทั้ง driver default (better-sqlite3) และ **sql.js** (ยืนยันว่า `json_extract` ใช้ได้)
+**Validation (2026-10-03):** full suite เทียบรายข้อกับรันแบบ stash: ไม่มี fail ใหม่ (100 fail เท่าเดิม, pass +10) · eslint ผ่าน · `npm run build` ผ่าน
+**E2E (2026-10-03):** build นี้รันแยกที่ port 20199 + `DATA_DIR` ว่างใน tmp (ไม่แตะ DB จริง) ต่อ upstream เป็น `anthropic-compatible` → gateway จริง `:20128` (ไม่ copy OAuth token)
+→ `claude -p` main `9-haiku-level` สั่ง subagent `9-fast-worker` → 3 rows ได้ `claude:1a90c1c6-…` **id เดียวกันทั้ง main และ subagent** · แท็บ Sessions แสดง 1 session / 3 requests / 2 models / duration 10.9s / model time 11.1s, Detail แยก 2 model + Total ตรงกับ DB
+(cost เป็น $0 ในการทดสอบนี้เพราะชื่อ combo บน instance ทดสอบไม่มีราคา — ค่า cost มาจาก `calculateCost` เดิมตอนบันทึก)
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ไฟล์ upstream ที่แตะ (แก้ 1–3 บรรทัด/ไฟล์): `chatCore.js` (churn สูงสุด), handler ทั้ง 3, `requestDetail.js` (`saveUsageStats`), `usageRepo.js` (INSERT), `schema.js`, `sessionManager.js` (export), `usage/page.js` (tab)
+ถ้า conflict: ให้ upstream ชนะแล้วใส่การส่ง `sessionId/clientTool/latency` กลับ · ถ้า upstream `SCHEMA_VERSION` ขยับเอง ให้ใช้ค่าที่สูงกว่า +1 · ถ้า upstream ทำ session tracking เองให้เทียบแล้วพิจารณา UPSTREAM_FIXED
+ตรวจเร็วหลัง upgrade: `cd tests && npx vitest run unit/usage-session.test.js`
 
 ---
 

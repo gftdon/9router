@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `f356ce30` | `src/app/(dashboard)/dashboard/usage/page.js` | LP-033: แท็บ Usage ค้างเมื่อ hard-load ด้วย `?tab=` → ใช้ `history.pushState` แทน `router.push` (บั๊ก upstream เดิม) | ACTIVE (ยังไม่ deploy) |
 | `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (E2E แล้ว · ติดตั้ง global แล้ว — รอ start + ยืนยัน live) |
 | `baedc557` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js` | LP-031: Responses upstream ส่ง `event: error` / `response.failed` หลัง HTTP 200 → client non-stream ได้ error (429 สำหรับ rate limit, 502 อื่นๆ) แทน 200 ว่าง เพื่อให้ account/combo fallback | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `df7999a5` | `open-sse/executors/muse.js` | LP-028: ย้าย effort เข้า `reasoning` เมื่อ Responses body มี `input` เป็น string (แก้ LP-018) | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -1132,6 +1133,20 @@ Rollback: `npm install --global` ทับด้วยของใน backup (�
 **⚠️ เช็คตอน upgrade รอบหน้า:** ไฟล์ upstream ที่แตะ (แก้ 1–3 บรรทัด/ไฟล์): `chatCore.js` (churn สูงสุด), handler ทั้ง 3, `requestDetail.js` (`saveUsageStats`), `usageRepo.js` (INSERT), `schema.js`, `sessionManager.js` (export), `usage/page.js` (tab)
 ถ้า conflict: ให้ upstream ชนะแล้วใส่การส่ง `sessionId/clientTool/latency` กลับ · ถ้า upstream `SCHEMA_VERSION` ขยับเอง ให้ใช้ค่าที่สูงกว่า +1 · ถ้า upstream ทำ session tracking เองให้เทียบแล้วพิจารณา UPSTREAM_FIXED
 ตรวจเร็วหลัง upgrade: `cd tests && npx vitest run unit/usage-session.test.js`
+
+---
+
+## LP-033: แท็บ Usage (Overview/Details/Sessions) กดไม่ได้ เมื่อโหลดหน้าด้วย `?tab=`
+
+**Status:** ACTIVE · **Commit:** `f356ce30` · **Implemented:** 2026-10-03 · พบหลัง deploy LP-032 (ผู้ใช้กด Overview/Sessions แล้วไม่เกิดอะไร)
+
+**อาการ:** เปิด `/dashboard/usage?tab=details` ตรงๆ (refresh / bookmark / วาง URL) → กดแท็บไหนก็ไม่เปลี่ยน · ถ้าเข้าจาก sidebar หรือ `/dashboard/usage` ที่ไม่มี query จะกดได้ปกติ
+**Root cause:** หน้า usage เป็น static prerender (`○`) — เมื่อ hard-load พร้อม `?tab=` แล้วเรียก `router.push` ไป pathname เดิมแต่ query ต่าง Next ไม่ยิง navigation เลย (ไม่มี RSC request, URL ไม่เปลี่ยน; hydrate ปกติ, onClick มี)
+**ไม่ใช่ regression จาก LP-032:** รัน build ก่อน LP-032 (จาก backup `/tmp/9router-before-lp032-20261003/`) ได้อาการเดียวกันเป๊ะ → เป็นพฤติกรรม upstream
+**แก้:** `usage/page.js` `handleTabChange` ใช้ `window.history.pushState` แทน `router.push` (Next sync `useSearchParams` กับ History API) — ถอด `useRouter` ที่ไม่ใช้แล้ว
+**Validation (2026-10-03):** headless Chromium: hard-load 4 แบบ (`/dashboard/usage`, `?tab=details|sessions|overview`) × กด Sessions→Overview→Details→Sessions + ปุ่ม Back → ผ่านทั้งหมด (ก่อนแก้ 3/4 แบบค้าง) · eslint + build ผ่าน
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream แก้ `usage/page.js` (เช่นเปลี่ยนเป็น dynamic หรือ Link) ให้ทดสอบ hard-load `?tab=details` แล้วกดแท็บ — ถ้าใช้ได้โดยไม่มี patch → UPSTREAM_FIXED
 
 ---
 

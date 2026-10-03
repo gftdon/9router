@@ -10,7 +10,7 @@
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
 | `origin/master` (`gftdon/9router`) | push ครบถึง LP-033 + เอกสาร |
 | Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `29c269cc` (LP-017..LP-033 + drawer 75%) — ติดตั้ง 2026-10-03 11:34 |
-| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update`, log `/tmp/9router.log`) — start 2026-10-03 11:34 หลังติดตั้ง LP-033 · ตัวก่อนหน้า (รันมือ ttys006) ปิดแล้ว |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update`, log `/tmp/9router.log`) — start 2026-10-03 11:34 หลังติดตั้ง LP-033 · ตัวก่อนหน้า (รันมือ ttys006) ปิดแล้ว · **plist บนดิสก์แก้แล้วตาม LP-034 (`--log` → `~/.9router/logs/server.log`) แต่ยังไม่ reload — รอผู้ใช้สั่ง restart** |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (ตั้งค่าแล้ว รอ reload) |
 | `f356ce30` | `src/app/(dashboard)/dashboard/usage/page.js` | LP-033: แท็บ Usage ค้างเมื่อ hard-load ด้วย `?tab=` → ใช้ `history.pushState` แทน `router.push` (บั๊ก upstream เดิม) | ACTIVE (deploy แล้ว) |
 | `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `baedc557` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js` | LP-031: Responses upstream ส่ง `event: error` / `response.failed` หลัง HTTP 200 → client non-stream ได้ error (429 สำหรับ rate limit, 502 อื่นๆ) แทน 200 ว่าง เพื่อให้ account/combo fallback | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -1151,6 +1152,40 @@ Rollback: `npm install --global` ทับด้วยของใน backup (�
 → `/api/health` 200, instance เดียว, `/api/usage/sessions` ไม่ login = 401 · หลัง restart มี row ใหม่ของ Claude Code ที่มี `sessionId` + cost เข้ามาทันที (LP-032 live: 2 sessions / 12 rows ตอนตรวจ)
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream แก้ `usage/page.js` (เช่นเปลี่ยนเป็น dynamic หรือ Link) ให้ทดสอบ hard-load `?tab=details` แล้วกดแท็บ — ถ้าใช้ได้โดยไม่มี patch → UPSTREAM_FIXED
+
+---
+
+## LP-034: server console log ของ gateway ที่รันจริงหายหมด → เปิด `--log` ใน LaunchAgent + หมุน log
+
+**Status:** ACTIVE · **Commit:** — (ตั้งค่าเครื่อง นอก repo ไม่มีโค้ด 9router เปลี่ยน) · **Implemented:** 2026-10-03 · **Type:** ops/config
+
+**อาการ:** fast-worker ใน session MaeModAI (`claude:00ca4929…`) ใช้ `muse/muse-spark-1.3-contributor(max)` แล้วเจอ "Failed to convert streaming response to JSON" → combo ตกไป `ag/gemini-3.8-flash-high` (10:32 UTC) และ `glm/glm-5.3(max)` (10:44 UTC)
+แต่หาสาเหตุจริงไม่ได้ เพราะไม่มี log ที่ไหนเก็บ error นี้ไว้เลย
+**Root cause (ของการไม่มี log):**
+- `cli.js` spawn server ด้วย `stdio: showLog ? "inherit" : ["ignore","ignore","pipe"]` (`cli/cli.js` ~บรรทัด 630) → ไม่ใส่ `--log` = stdout ถูกทิ้ง, stderr เก็บแค่ใน memory (`crashLog`)
+- `/tmp/9router.log` ที่ plist ชี้ไว้จึงมีแค่ banner ของ launcher, `/tmp/9router.error.log` ว่าง
+- `requestDetails` บันทึกเฉพาะเมื่อเปิด observability (`requestDetailsRepo.js:145`) และ catch ของ SSE→JSON (`sseToJsonHandler.js:309/390`) มีแค่ `console.error` ไม่ได้ `saveRequestDetail`
+- `usageHistory` เก็บเฉพาะ request ที่สำเร็จ
+**แก้ (ไม่แตะโค้ด):**
+- `~/Library/LaunchAgents/com.9router.autostart.plist`: เพิ่ม `--log` ใน `ProgramArguments`; `StandardOutPath` → `~/.9router/logs/server.log`, `StandardErrorPath` → `~/.9router/logs/server.error.log` (เดิม `/tmp/…` หายตอนรีบูต)
+- `~/.9router/bin/rotate-logs.sh` + LaunchAgent `com.9router.logrotate` (ทุก 3600 วิ): ไฟล์เกิน 50 MB → gzip เป็น `.1.gz` เก็บ 5 ชุด แล้ว truncate ไฟล์เดิม
+  ใช้ copy-truncate เพราะ launchd เปิดไฟล์ค้างไว้แบบ append — ถ้า rename ไฟล์ launchd จะเขียนต่อลงไฟล์เก่า
+- สำรอง plist เดิม: `~/.9router/com.9router.autostart.plist.bak-20261003`
+**Validation (2026-10-03):** `plutil -lint` ผ่านทั้ง 2 plist · ทดสอบสคริปต์ใน sandbox ด้วย writer แบบ `>>` ที่เปิดไฟล์ค้าง: หมุนแล้วไม่มีบรรทัดหาย ไม่มี null byte, writer เขียนต่อหลัง truncate ได้ · `com.9router.logrotate` โหลดแล้ว (run interval 3600) · gateway ตัวที่รันอยู่ไม่ถูกแตะ (pid เดิม)
+**ยังไม่ apply กับ gateway ที่รันอยู่** — launchd อ่าน plist ใหม่เฉพาะตอนโหลด job ใหม่ (`kickstart` อย่างเดียวไม่พอ) และการ reload จะตัด request ที่วิ่งอยู่ → ผู้ใช้ขอให้รองานค้างเสร็จก่อน:
+```bash
+launchctl bootout gui/$(id -u)/com.9router.autostart; sleep 2; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.9router.autostart.plist
+```
+ยืนยันหลัง reload: `launchctl print gui/$(id -u)/com.9router.autostart | grep "stdout path"` ต้องเป็น `~/.9router/logs/server.log` และ `tail -f ~/.9router/logs/server.log` ต้องเห็นบรรทัด request
+Rollback: `cp ~/.9router/com.9router.autostart.plist.bak-20261003 ~/Library/LaunchAgents/com.9router.autostart.plist` แล้ว bootout/bootstrap · ถอดตัวหมุน log: `launchctl bootout gui/$(id -u)/com.9router.logrotate` + ลบ plist/สคริปต์
+
+**ความปลอดภัย:** log อยู่ใน home ของผู้ใช้ (ไม่ใช่ `/tmp` ที่ทุก user อ่านได้) · console log ของ server เป็นบรรทัดสรุป request/error — ไม่ใช่ request log เต็ม (`ENABLE_REQUEST_LOGS` ยังปิด ไม่มี `x-api-key`)
+แต่ข้อความ error จาก upstream อาจมีเนื้อหาบางส่วนของ prompt/ชื่อบัญชี → อย่าแชร์ไฟล์ log ทั้งไฟล์ออกไปข้างนอก
+
+**⚠️ เช็คตอน upgrade / เปลี่ยนเครื่อง:**
+- **เมนู tray "Enable Auto-start"** (`cli/src/cli/tray/autostart.js` `enableMacOS`) **เขียน plist ใหม่ทับ** — กลับเป็น `--tray --skip-update` + log `/tmp` → ถ้ากด Disable/Enable Auto-start ต้องใส่ LP-034 กลับ
+- ถ้า upstream เปลี่ยนชื่อ/ความหมายของ `--log` ใน `cli.js` หรือเพิ่ม log file ของตัวเอง → เทียบแล้วพิจารณา UPSTREAM_FIXED (ถอด `--log` + ตัวหมุน log)
+- การอัปเดต npm global (`npm install --global ./9router-*.tgz`) ไม่แตะ plist — ไม่ต้องทำอะไร
 
 ---
 

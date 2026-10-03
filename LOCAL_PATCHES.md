@@ -1135,6 +1135,12 @@ Rollback: `npm install --global` ทับด้วยของใน backup (�
 ถ้า conflict: ให้ upstream ชนะแล้วใส่การส่ง `sessionId/clientTool/latency` กลับ · ถ้า upstream `SCHEMA_VERSION` ขยับเอง ให้ใช้ค่าที่สูงกว่า +1 · ถ้า upstream ทำ session tracking เองให้เทียบแล้วพิจารณา UPSTREAM_FIXED
 ตรวจเร็วหลัง upgrade: `cd tests && npx vitest run unit/usage-session.test.js`
 **ปรับ UI (`a4a1c08e`, 2026-10-03):** Drawer Session Details กว้าง 75% ของจอ (`width="full"` + `sm:max-w-[75vw]`; มือถือเต็มจอ) — วัดจริง 1500px→1125px, 1920px→1440px, 390px→390px · แก้เฉพาะ `SessionsTab.js` (deploy 2026-10-03 11:34)
+**จำกัดช่วงข้อมูลที่รวมยอด (`4d4150ce`, 2026-10-03):** `usageHistory` ไม่มีการลบข้อมูลเก่า (upstream ไม่มี retention) → query รวมยอดเดิม GROUP BY ทั้งตารางทุกครั้งที่เปิดหน้า
+วัดบนสำเนา DB ที่ใส่ sessionId ทุกแถว (228K แถว/11 สัปดาห์): 0.28 วิ → คาดราว 3 วิ/query ที่ 1 ปี (หน้า list รัน 2 query)
+แก้: `sessionUsage.js` หา session ที่มี request ในช่วงวันที่ผ่าน `idx_uh_ts` ก่อน (`sessionId IN (subquery)`) แล้วรวมยอดเฉพาะ session เหล่านั้น — ยังนับเต็มทั้ง session ·
+`SessionsTab.js` ตั้งค่าเริ่มต้น Start Date = 30 วันล่าสุด (ปุ่มเปลี่ยนเป็น "Reset to last 30 days"; ลบ Start Date เองเพื่อดูทั้งหมด)
+ความหมายเปลี่ยนเล็กน้อย: session ที่คร่อมช่วงแต่**ไม่มี request อยู่ในช่วงเลย** ไม่ถูกนับแล้ว (ตรงกับ comment เดิม "any of its requests falls inside the range")
+Tests +1 (×2 driver) — แดงกับโค้ดเดิม · eslint + build ผ่าน · query plan: `idx_uh_ts` (subquery) + covering `idx_uh_session` · **ยังไม่ deploy** (รอ restart รอบ LP-034)
 
 ---
 

@@ -248,6 +248,15 @@ export async function getActiveRequests() {
   return { activeRequests, recentRequests, errorProvider };
 }
 
+// Per-request extras for the Sessions tab: latency + client tool (sessionId has its own column)
+function buildUsageMeta(entry) {
+  const meta = {};
+  if (Number.isFinite(entry.latency?.total)) meta.latencyMs = entry.latency.total;
+  if (Number.isFinite(entry.latency?.ttft)) meta.ttftMs = entry.latency.ttft;
+  if (entry.clientTool) meta.clientTool = entry.clientTool;
+  return meta;
+}
+
 export async function saveRequestUsage(entry) {
   try {
     const db = await getAdapter();
@@ -289,12 +298,12 @@ export async function saveRequestUsage(entry) {
       }
 
       db.run(
-        `INSERT INTO usageHistory(timestamp, provider, model, connectionId, apiKey, endpoint, promptTokens, completionTokens, cost, status, tokens, meta) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO usageHistory(timestamp, provider, model, connectionId, apiKey, endpoint, promptTokens, completionTokens, cost, status, tokens, meta, sessionId) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           entry.timestamp, entry.provider || null, entry.model || null,
           entry.connectionId || null, entry.apiKey || null, entry.endpoint || null,
           promptTokens, completionTokens, entry.cost || 0, entry.status || "ok",
-          stringifyJson(tokens), stringifyJson({}),
+          stringifyJson(tokens), stringifyJson(buildUsageMeta(entry)), entry.sessionId || null,
         ]
       );
 

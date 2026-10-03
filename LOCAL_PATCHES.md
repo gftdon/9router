@@ -8,9 +8,9 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-032 + เอกสาร |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `5127d37c` (LP-017..LP-032) — ติดตั้ง 2026-10-03 11:13 |
-| Server ที่รันอยู่ | **หยุดอยู่** — ปิดตัวเดิม (รันมือจาก ttys006, build `baedc557`) 2026-10-03 11:12 เพื่อติดตั้ง LP-032; ผู้ใช้จะ start เอง · LaunchAgent `com.9router.autostart` ไม่ได้รัน (KeepAlive=false) |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-033 + เอกสาร |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `29c269cc` (LP-017..LP-033 + drawer 75%) — ติดตั้ง 2026-10-03 11:34 |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update`, log `/tmp/9router.log`) — start 2026-10-03 11:34 หลังติดตั้ง LP-033 · ตัวก่อนหน้า (รันมือ ttys006) ปิดแล้ว |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -25,8 +25,8 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
-| `f356ce30` | `src/app/(dashboard)/dashboard/usage/page.js` | LP-033: แท็บ Usage ค้างเมื่อ hard-load ด้วย `?tab=` → ใช้ `history.pushState` แทน `router.push` (บั๊ก upstream เดิม) | ACTIVE (ยังไม่ deploy) |
-| `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (E2E แล้ว · ติดตั้ง global แล้ว — รอ start + ยืนยัน live) |
+| `f356ce30` | `src/app/(dashboard)/dashboard/usage/page.js` | LP-033: แท็บ Usage ค้างเมื่อ hard-load ด้วย `?tab=` → ใช้ `history.pushState` แทน `router.push` (บั๊ก upstream เดิม) | ACTIVE (deploy แล้ว) |
+| `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `baedc557` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js` | LP-031: Responses upstream ส่ง `event: error` / `response.failed` หลัง HTTP 200 → client non-stream ได้ error (429 สำหรับ rate limit, 502 อื่นๆ) แทน 200 ว่าง เพื่อให้ account/combo fallback | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `df7999a5` | `open-sse/executors/muse.js` | LP-028: ย้าย effort เข้า `reasoning` เมื่อ Responses body มี `input` เป็น string (แก้ LP-018) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `6a389c60` | `open-sse/handlers/chatCore.js` | LP-029: provider ที่ forceStream แต่ตอบ JSON ธรรมดา → ใช้ handler non-stream แทนการห่อ JSON เป็น SSE | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -1133,7 +1133,7 @@ Rollback: `npm install --global` ทับด้วยของใน backup (�
 **⚠️ เช็คตอน upgrade รอบหน้า:** ไฟล์ upstream ที่แตะ (แก้ 1–3 บรรทัด/ไฟล์): `chatCore.js` (churn สูงสุด), handler ทั้ง 3, `requestDetail.js` (`saveUsageStats`), `usageRepo.js` (INSERT), `schema.js`, `sessionManager.js` (export), `usage/page.js` (tab)
 ถ้า conflict: ให้ upstream ชนะแล้วใส่การส่ง `sessionId/clientTool/latency` กลับ · ถ้า upstream `SCHEMA_VERSION` ขยับเอง ให้ใช้ค่าที่สูงกว่า +1 · ถ้า upstream ทำ session tracking เองให้เทียบแล้วพิจารณา UPSTREAM_FIXED
 ตรวจเร็วหลัง upgrade: `cd tests && npx vitest run unit/usage-session.test.js`
-**ปรับ UI (`a4a1c08e`, 2026-10-03):** Drawer Session Details กว้าง 75% ของจอ (`width="full"` + `sm:max-w-[75vw]`; มือถือเต็มจอ) — วัดจริง 1500px→1125px, 1920px→1440px, 390px→390px · แก้เฉพาะ `SessionsTab.js` (ยังไม่ deploy)
+**ปรับ UI (`a4a1c08e`, 2026-10-03):** Drawer Session Details กว้าง 75% ของจอ (`width="full"` + `sm:max-w-[75vw]`; มือถือเต็มจอ) — วัดจริง 1500px→1125px, 1920px→1440px, 390px→390px · แก้เฉพาะ `SessionsTab.js` (deploy 2026-10-03 11:34)
 
 ---
 
@@ -1146,6 +1146,9 @@ Rollback: `npm install --global` ทับด้วยของใน backup (�
 **ไม่ใช่ regression จาก LP-032:** รัน build ก่อน LP-032 (จาก backup `/tmp/9router-before-lp032-20261003/`) ได้อาการเดียวกันเป๊ะ → เป็นพฤติกรรม upstream
 **แก้:** `usage/page.js` `handleTabChange` ใช้ `window.history.pushState` แทน `router.push` (Next sync `useSearchParams` กับ History API) — ถอด `useRouter` ที่ไม่ใช้แล้ว
 **Validation (2026-10-03):** headless Chromium: hard-load 4 แบบ (`/dashboard/usage`, `?tab=details|sessions|overview`) × กด Sessions→Overview→Details→Sessions + ปุ่ม Back → ผ่านทั้งหมด (ก่อนแก้ 3/4 แบบค้าง) · eslint + build ผ่าน
+
+**Deploy (2026-10-03 11:34):** สำรองที่ `/tmp/9router-before-lp033-20261003/` (global + SQLite, integrity ok) → `cli:pack` (ตรวจ tarball มี `history.pushState` + `max-w-[75vw]`) → รอ connection ค้าง = 0 → ปิดตัวเดิม → `npm install --global` → `launchctl kickstart gui/$(id -u)/com.9router.autostart`
+→ `/api/health` 200, instance เดียว, `/api/usage/sessions` ไม่ login = 401 · หลัง restart มี row ใหม่ของ Claude Code ที่มี `sessionId` + cost เข้ามาทันที (LP-032 live: 2 sessions / 12 rows ตอนตรวจ)
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream แก้ `usage/page.js` (เช่นเปลี่ยนเป็น dynamic หรือ Link) ให้ทดสอบ hard-load `?tab=details` แล้วกดแท็บ — ถ้าใช้ได้โดยไม่มี patch → UPSTREAM_FIXED
 

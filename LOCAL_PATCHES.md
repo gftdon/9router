@@ -1133,6 +1133,7 @@ Rollback: `npm install --global` ทับด้วยของใน backup (�
 **⚠️ เช็คตอน upgrade รอบหน้า:** ไฟล์ upstream ที่แตะ (แก้ 1–3 บรรทัด/ไฟล์): `chatCore.js` (churn สูงสุด), handler ทั้ง 3, `requestDetail.js` (`saveUsageStats`), `usageRepo.js` (INSERT), `schema.js`, `sessionManager.js` (export), `usage/page.js` (tab)
 ถ้า conflict: ให้ upstream ชนะแล้วใส่การส่ง `sessionId/clientTool/latency` กลับ · ถ้า upstream `SCHEMA_VERSION` ขยับเอง ให้ใช้ค่าที่สูงกว่า +1 · ถ้า upstream ทำ session tracking เองให้เทียบแล้วพิจารณา UPSTREAM_FIXED
 ตรวจเร็วหลัง upgrade: `cd tests && npx vitest run unit/usage-session.test.js`
+**ปรับ UI (`a4a1c08e`, 2026-10-03):** Drawer Session Details กว้าง 75% ของจอ (`width="full"` + `sm:max-w-[75vw]`; มือถือเต็มจอ) — วัดจริง 1500px→1125px, 1920px→1440px, 390px→390px · แก้เฉพาะ `SessionsTab.js` (ยังไม่ deploy)
 
 ---
 

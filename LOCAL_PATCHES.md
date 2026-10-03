@@ -9,8 +9,8 @@
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
 | `origin/master` (`gftdon/9router`) | push ครบถึง LP-033 + เอกสาร |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `29c269cc` (LP-017..LP-033 + drawer 75%) — ติดตั้ง 2026-10-03 11:34 |
-| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update`, log `/tmp/9router.log`) — start 2026-10-03 11:34 หลังติดตั้ง LP-033 · ตัวก่อนหน้า (รันมือ ttys006) ปิดแล้ว · **plist บนดิสก์แก้แล้วตาม LP-034 (`--log` → `~/.9router/logs/server.log`) แต่ยังไม่ reload — รอผู้ใช้สั่ง restart** |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `4766c640` (LP-017..LP-033 + drawer 75% + Sessions date-window) — ติดตั้ง 2026-10-03 20:22 |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-03 20:22 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -25,7 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
-| — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (ตั้งค่าแล้ว รอ reload) |
+| — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (apply + ยืนยัน live แล้ว) |
 | `f356ce30` | `src/app/(dashboard)/dashboard/usage/page.js` | LP-033: แท็บ Usage ค้างเมื่อ hard-load ด้วย `?tab=` → ใช้ `history.pushState` แทน `router.push` (บั๊ก upstream เดิม) | ACTIVE (deploy แล้ว) |
 | `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `baedc557` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js` | LP-031: Responses upstream ส่ง `event: error` / `response.failed` หลัง HTTP 200 → client non-stream ได้ error (429 สำหรับ rate limit, 502 อื่นๆ) แทน 200 ว่าง เพื่อให้ account/combo fallback | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -1140,7 +1140,7 @@ Rollback: `npm install --global` ทับด้วยของใน backup (�
 แก้: `sessionUsage.js` หา session ที่มี request ในช่วงวันที่ผ่าน `idx_uh_ts` ก่อน (`sessionId IN (subquery)`) แล้วรวมยอดเฉพาะ session เหล่านั้น — ยังนับเต็มทั้ง session ·
 `SessionsTab.js` ตั้งค่าเริ่มต้น Start Date = 30 วันล่าสุด (ปุ่มเปลี่ยนเป็น "Reset to last 30 days"; ลบ Start Date เองเพื่อดูทั้งหมด)
 ความหมายเปลี่ยนเล็กน้อย: session ที่คร่อมช่วงแต่**ไม่มี request อยู่ในช่วงเลย** ไม่ถูกนับแล้ว (ตรงกับ comment เดิม "any of its requests falls inside the range")
-Tests +1 (×2 driver) — แดงกับโค้ดเดิม · eslint + build ผ่าน · query plan: `idx_uh_ts` (subquery) + covering `idx_uh_session` · **ยังไม่ deploy** (รอ restart รอบ LP-034)
+Tests +1 (×2 driver) — แดงกับโค้ดเดิม · eslint + build ผ่าน · query plan: `idx_uh_ts` (subquery) + covering `idx_uh_session` · deploy 2026-10-03 20:22 พร้อม LP-034
 
 ---
 
@@ -1183,10 +1183,14 @@ Tests +1 (×2 driver) — แดงกับโค้ดเดิม · eslint +
 launchctl bootout gui/$(id -u)/com.9router.autostart; sleep 2; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.9router.autostart.plist
 ```
 ยืนยันหลัง reload: `launchctl print gui/$(id -u)/com.9router.autostart | grep "stdout path"` ต้องเป็น `~/.9router/logs/server.log` และ `tail -f ~/.9router/logs/server.log` ต้องเห็นบรรทัด request
+**Apply + live (2026-10-03 20:22):** รองานค้างเสร็จตามที่ผู้ใช้สั่ง → `cli:pack` (`4766c640`) → สำรองที่ `/tmp/9router-before-lp034-20261003/` (global + SQLite, integrity ok, 229,010 rows)
+→ ไม่มี Claude Code ต่อค้าง (เหลือแท็บ dashboard + dev server ai-business-os-fable) → `bootout` (ทั้ง 2 process ออก, port ว่าง) → `npm install --global` → `bootstrap`
+→ `/api/health` 200, instance เดียว, `/api/usage/sessions` ไม่ login = 401 · `launchctl print`: args มี `--log`, stdout = `~/.9router/logs/server.log`
+→ ยิง `9-haiku-level` 1 ครั้ง: log มีบรรทัด `[COMBO] Trying model 1/3` / `succeeded` / `DONE 1993ms` และ usage row มี `sessionId` + latency
 Rollback: `cp ~/.9router/com.9router.autostart.plist.bak-20261003 ~/Library/LaunchAgents/com.9router.autostart.plist` แล้ว bootout/bootstrap · ถอดตัวหมุน log: `launchctl bootout gui/$(id -u)/com.9router.logrotate` + ลบ plist/สคริปต์
 
 **ความปลอดภัย:** log อยู่ใน home ของผู้ใช้ (ไม่ใช่ `/tmp` ที่ทุก user อ่านได้) · console log ของ server เป็นบรรทัดสรุป request/error — ไม่ใช่ request log เต็ม (`ENABLE_REQUEST_LOGS` ยังปิด ไม่มี `x-api-key`)
-แต่ข้อความ error จาก upstream อาจมีเนื้อหาบางส่วนของ prompt/ชื่อบัญชี → อย่าแชร์ไฟล์ log ทั้งไฟล์ออกไปข้างนอก
+แต่บรรทัด request มีอีเมลบัญชี upstream (`ACC:…`) และข้อความ error จาก upstream อาจมีเนื้อหาบางส่วนของ prompt → อย่าแชร์ไฟล์ log ทั้งไฟล์ออกไปข้างนอก
 
 **⚠️ เช็คตอน upgrade / เปลี่ยนเครื่อง:**
 - **เมนู tray "Enable Auto-start"** (`cli/src/cli/tray/autostart.js` `enableMacOS`) **เขียน plist ใหม่ทับ** — กลับเป็น `--tray --skip-update` + log `/tmp` → ถ้ากด Disable/Enable Auto-start ต้องใส่ LP-034 กลับ

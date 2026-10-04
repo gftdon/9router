@@ -8,7 +8,7 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-033 + เอกสาร |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-036 + เอกสาร + `scripts/local/session-analysis` (2026-10-04) |
 | Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `26267bb5` (LP-017..LP-036) — ติดตั้ง 2026-10-04 13:33 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp035-036-20261004/`) |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-04 13:33 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
@@ -1266,6 +1266,25 @@ request ที่ cache 0 ใช้เวลานานกว่า (13–20 �
 
 **ตอนกลับมาทำ:** วัดใหม่ก่อน — `du -h ~/.9router/db/data.sqlite` และ `sqlite3 -readonly ~/.9router/db/data.sqlite "select name, sum(pgsize)/1048576.0 from dbstat group by name order by 2 desc limit 8;"`
 ความเร็วแท็บ Sessions ไม่ต้องห่วงแล้ว (คงที่ ~0.2 วิ ตามช่วง 30 วัน) — เรื่องนี้เป็นเรื่องพื้นที่ดิสก์อย่างเดียว
+
+### TODO: muse `(max)` เงียบเกิน 5 นาที → `UND_ERR_BODY_TIMEOUT` → fast-worker ล้ม — รอทดสอบหลัง LP-036
+
+**สถานะ:** ยังไม่แก้ (ผู้ใช้ขอรอทดสอบงานรอบใหม่หลัง deploy LP-035/036 ก่อน, 2026-10-04) · พบจาก session MaeModAI `77a9dc57` (9router) เทียบ MaeModAI-3 (native)
+ข้อมูลวิเคราะห์: `node scripts/local/session-analysis/collect.mjs` → `analysis/compare-2026-10-04-native-vs-9router.md` (native 1h00m vs 9router 3h33m แล้วหยุดกลางทาง)
+
+**ต้นเหตุจริงของ "Failed to convert streaming response to JSON":** `server.error.log` บรรทัด `[ChatCore] Responses API SSE→JSON failed: TypeError: terminated` → `cause: BodyTimeoutError` (`UND_ERR_BODY_TIMEOUT`)
+= undici `bodyTimeout` default 300s (9router ไม่ได้ตั้งเอง) ตัดเมื่อ upstream ไม่ส่ง byte เลย 5 นาที
+1. muse `(max)` คิดนาน: output เฉลี่ย 4.8K token/call สูงสุด 24K (14/71 call > 10K) บาง call เงียบ > 5 นาที
+2. stream ฝั่ง Claude Code ล้ม → Claude Code ยิงซ้ำแบบ non-stream → 9router ต้องรอ (`handleForcedSSEToJson`) → body timeout 300s → 502 → lock account 30s → fallback glm
+3. Claude Code timeout เองด้วย → subagent จบด้วย "Request timed out (server_error)" (fast-worker "Implement media core" ตาย 2 ครั้ง 11:53, 12:54)
+- ป้าย `STREAM` ใน log คือขา 9router→muse (forceStream) ไม่ใช่ของ client — request non-stream ของ client ก็ขึ้น `STREAM` (ดู `ttftMs` ว่างใน `usageHistory.meta` แทน)
+
+**ทางเลือก (ยังไม่ได้ทำ):**
+1. ลด effort muse ใน combo `9-fast-worker` จาก `(max)` → `(high)`/`(medium)` — แก้ตรงจุด ไม่แตะโค้ด (แนะนำ)
+2. ตั้ง undici `bodyTimeout` ให้สอดคล้อง `STREAM_STALL_TIMEOUT_MS` (360s) — ลดอาการเท่านั้น turn ยังช้า
+3. เปลี่ยนโมเดลแรกของ fast-worker แล้วรันงานเดิมเทียบด้วย `compare.mjs`
+
+**ตอนกลับมาดู:** รันงานเดิมผ่าน 9router หลัง LP-036 → `collect.mjs` + `compare.mjs` เทียบกับ run 2026-10-04; ดู `grep -a "STALL TIMEOUT\|SSE→JSON failed" ~/.9router/logs/server*.log` (LP-035 บอก chunks/bytes ก่อนเงียบ)
 
 ### Bug A → แก้แล้วเป็น LP-026 (ดูหัวข้อ LP-026 ด้านบน) — บันทึกเดิม:
 

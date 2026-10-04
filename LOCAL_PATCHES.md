@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE (commit แล้ว ยังไม่ deploy) |
 | `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE |
 | `63a96737` | `open-sse/utils/streamHandler.js` | LP-035: บรรทัด `STALL TIMEOUT … chunks/bytes/sinceLast` พิมพ์เสมอ (เดิมผ่าน `dbg()` ที่ทำงานเฉพาะ dev) | ACTIVE |
 | — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (apply + ยืนยัน live แล้ว) |
@@ -1242,6 +1243,33 @@ request ที่ cache 0 ใช้เวลานานกว่า (13–20 �
 **Deploy:** 2026-10-04 13:33 พร้อม LP-035 · **ยืนยัน live:** ยิง `/v1/messages` (system ~10.4K token) ซ้ำ 4 ครั้งด้วย `x-claude-code-session-id` เดียวกัน → ครั้งแรก cached 0 (สร้าง cache), ครั้งที่ 2–4 cached 10,353/10,424 (99%) ทุกครั้ง · ที่ยังต้องดู: session Claude Code จริงที่ใช้ muse ใน Sessions › Detail ควร ≥ ~90%
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream ใส่ `prompt_cache_key` ให้ muse (หรือ DefaultExecutor) เอง → UPSTREAM_FIXED · provider อื่นที่เป็น Responses แต่ไม่ใช่ Codex อาจมีปัญหาเดียวกัน (ยังไม่ได้วัด)
+
+---
+
+## LP-037: suffix effort ใน combo (`cc/claude-opus-5-5(high)`) ไม่มีผลกับ request แบบ passthrough
+
+**Status:** ACTIVE · **Commit:** `1271470a` · **Implemented:** 2026-10-04 · พบจากการเทียบ native vs 9router (`analysis/x-importdup-native-vs-9router.html`)
+
+**อาการ:** ตั้ง combo `9-orchestrator` = `cc/claude-opus-5-5(high)` แต่ log ขึ้น `THINK:32k` ทุก request — 2026-10-04 ทั้งวัน `claude/*` 447/447 request เป็น `32k` ไม่ว่า combo จะตั้ง `(high)` หรือ `(medium)`
+ขณะที่ provider ที่ต้องแปลง format ได้ตาม combo ครบ (muse `(max)` → max, codex `(high)` → high, glm `(max)` → max)
+ผล: เทียบกับ native ไม่ได้ตรง — native ส่ง `effort: high` ทุก call ส่วนฝั่ง 9router ส่ง budget 32k (แต่ละ call ช้ากว่า 1.6–1.7 เท่า)
+**Root cause:** `chatCore.js` — ถ้า `isNativePassthrough(clientTool, provider)` (Claude Code → `claude`/`anthropic`/`anthropic-compatible-*`, gemini-cli → gemini-cli, antigravity → antigravity, codex → codex)
+จะไม่เรียก `translateRequest` เลย จึงไม่เคยถึง `applyThinking` — มีแค่ `stripThinkingSuffix` ตัด `(high)` ออกจากชื่อโมเดล · codex มีโค้ดใส่ `reasoning.effort` เองอยู่แล้ว ที่เหลือไม่มี
+ค่า 32k มาจาก Claude Code เอง: ชื่อโมเดลแบบ gateway (`9-orchestrator`) ไม่ถูกจำเป็น Opus 5.5 จึงส่ง `thinking.budget_tokens` แบบเก่าแทน adaptive + effort
+**แก้:** `applyPassthroughSuffixThinking()` (ไฟล์ใหม่ `open-sse/translator/concerns/passthroughThinking.js`) เรียกจาก passthrough ใน chatCore ก่อน `normalizeClaudePassthrough`
+- มี suffix เท่านั้นถึงทำ (ไม่มี suffix → body ไม่ถูกแตะ คง lossless) · ใช้ `applyThinking` ตัวเดียวกับ path ที่แปลง format (capability-driven: Opus/Sonnet 5.5 → `thinking: adaptive` + `output_config.effort`, Fable → effort อย่างเดียว, Haiku 4.5 → budget, `(none)` → disabled, xhigh clamp ตาม levels ของโมเดล)
+- เก็บ field อื่นใน `output_config` ของ client (เช่น `format`) และ `thinking.display` ไว้ (`applyThinking` ลบ `output_config` ทั้งก้อน)
+- โมเดลแบบ budget: ปรับ `max_tokens > budget_tokens` แบบเดียวกับ `prepareClaudeRequest` (passthrough ไม่ผ่านตรงนั้น)
+- Gemini envelope (gemini-cli / antigravity): เขียน `request.generationConfig.thinkingConfig` โดย copy object ซ้อนก่อน เพื่อไม่ให้ body ต้นฉบับถูกแก้ (combo fallback ใช้ body เดิมต่อ)
+- format ที่ wire รับไม่ได้ (โมเดล Claude บน antigravity envelope) → ข้าม ไม่แตะ · codex คงโค้ดเดิม
+- แตะไฟล์ upstream น้อยที่สุด: `chatCore.js` +6 บรรทัด, `thinkingUnified.js` เติม `export` ให้ `resolveFormat`
+**ผลข้างเคียงที่ตั้งใจ:** suffix ใน combo ชนะค่าที่ client ส่ง (เหมือน path ที่แปลง format) · บรรทัด log `THINK:` จะเปลี่ยนจาก `32k` เป็นระดับ เช่น `high`
+
+**Tests:** `tests/unit/passthrough-suffix-thinking.test.js` +13 (Claude wire: high/medium/none/xhigh clamp/Fable/Haiku budget/เก็บ output_config+display/ไม่มี suffix · anthropic + anthropic-compatible · gemini-cli envelope + ไม่แก้ body ต้นฉบับ · ข้าม Claude บน antigravity · ข้าม wire อื่น · ผ่าน chatCore จริง 2 ข้อ) — ข้อ chatCore แดงกับโค้ดเดิม
+**Validation (2026-10-04):** full suite เทียบรายข้อกับโค้ดก่อนแก้: ไม่มี fail ใหม่ (100 fail เท่าเดิม, 3,263 → 3,276 tests) · eslint ผ่าน · (`verify-no-regression.mjs` อ่าน JSON ของ vitest 4 ไม่ได้ — ชื่อไฟล์เป็น `undefined` — จึงเทียบด้วยการรัน suite สองรอบแทน)
+**Deploy:** ยังไม่ทำ — รอผู้ใช้สั่ง · ยืนยันหลัง deploy: log ของ `cc/…(high)` ต้องขึ้น `THINK:high` แทน `THINK:32k`
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream ใส่ suffix thinking ใน passthrough เอง (ดู block `if (passthrough)` ใน `chatCore.js`) → UPSTREAM_FIXED · ถ้า upstream เปลี่ยนชื่อ/signature ของ `resolveFormat`/`applyThinking` ต้องปรับ `passthroughThinking.js`
 
 ---
 

@@ -1284,6 +1284,21 @@ request ที่ cache 0 ใช้เวลานานกว่า (13–20 �
 2. ตั้ง undici `bodyTimeout` ให้สอดคล้อง `STREAM_STALL_TIMEOUT_MS` (360s) — ลดอาการเท่านั้น turn ยังช้า
 3. เปลี่ยนโมเดลแรกของ fast-worker แล้วรันงานเดิมเทียบด้วย `compare.mjs`
 
+**ผลหลัง deploy LP-036 (13:55–14:28 วันเดียวกัน):** muse cache 96.5% (93 req), latency เฉลี่ย 28 วิ (เดิม 84), ไม่มี muse error/fallback → ผู้ใช้เลือก**ไม่แก้ timeout** รอดูว่ารอดไหม (ผู้ใช้: ไม่ควรเกิน 5 นาทีอยู่แล้ว)
+
+**ถ้ายังล้มอีก — ด่าน timeout ทั้งหมด (ตรวจ 2026-10-04, Claude Code 2.1.289):**
+
+| ด่าน | ค่าเดิม | ปรับที่ |
+|---|---|---|
+| Claude Code stream idle (ไม่มี event) → ตกไป non-stream fallback | 300s (ช่วงที่รับ 300–1800s, ต่ำกว่า 300 = 300) | env `CLAUDE_STREAM_IDLE_TIMEOUT_MS` |
+| Claude Code request non-stream | 600s | env `API_TIMEOUT_MS` |
+| 9router undici `bodyTimeout` (global fetch, ไม่มี dispatcher ถ้าไม่ใช้ proxy) | 300s | ต้องแก้โค้ด (`setGlobalDispatcher`/Agent ใน `open-sse/utils/proxyFetch.js`) |
+| 9router stall watchdog (`pipeWithDisconnect`) | 360s | env `STREAM_STALL_TIMEOUT_MS` (plist) |
+
+- pattern ใน log: muse START (stream) → ~6 นาทีต่อมา START ซ้ำ จำนวน MSG เท่าเดิม (= Claude Code idle 300s แล้วยิง non-stream) → FAIL 70–90 วิหลัง START ที่สอง → glm (`JSON`) — 11:36/11:41, 12:15/12:21, 12:42/12:48, 13:23/13:29
+- **ยังไม่เข้าใจ:** FAIL ที่ 70–90 วิไม่ตรงกับ bodyTimeout 300s — log ไม่มี request id ให้จับคู่ error กับ request
+- ค่าที่เสนอไว้ (ถ้าจะแก้): 9router undici + stall 900s < `CLAUDE_STREAM_IDLE_TIMEOUT_MS=960000` < `API_TIMEOUT_MS=1500000` (9router ตัดก่อนเพื่อ fallback glm ใน request เดียว) · call ยาวสุดที่สำเร็จ 7m47s
+
 **ตอนกลับมาดู:** รันงานเดิมผ่าน 9router หลัง LP-036 → `collect.mjs` + `compare.mjs` เทียบกับ run 2026-10-04; ดู `grep -a "STALL TIMEOUT\|SSE→JSON failed" ~/.9router/logs/server*.log` (LP-035 บอก chunks/bytes ก่อนเงียบ)
 
 ### Bug A → แก้แล้วเป็น LP-026 (ดูหัวข้อ LP-026 ด้านบน) — บันทึกเดิม:

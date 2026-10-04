@@ -9,8 +9,8 @@
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
 | `origin/master` (`gftdon/9router`) | push ครบถึง LP-033 + เอกสาร |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `4766c640` (LP-017..LP-033 + drawer 75% + Sessions date-window) — ติดตั้ง 2026-10-03 20:22 |
-| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-03 20:22 (bootout + bootstrap) |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `26267bb5` (LP-017..LP-036) — ติดตั้ง 2026-10-04 13:33 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp035-036-20261004/`) |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-04 13:33 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -25,8 +25,8 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
-| `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE (commit แล้ว ยังไม่ deploy) |
-| `63a96737` | `open-sse/utils/streamHandler.js` | LP-035: บรรทัด `STALL TIMEOUT … chunks/bytes/sinceLast` พิมพ์เสมอ (เดิมผ่าน `dbg()` ที่ทำงานเฉพาะ dev) | ACTIVE (commit แล้ว ยังไม่ deploy) |
+| `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE |
+| `63a96737` | `open-sse/utils/streamHandler.js` | LP-035: บรรทัด `STALL TIMEOUT … chunks/bytes/sinceLast` พิมพ์เสมอ (เดิมผ่าน `dbg()` ที่ทำงานเฉพาะ dev) | ACTIVE |
 | — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (apply + ยืนยัน live แล้ว) |
 | `f356ce30` | `src/app/(dashboard)/dashboard/usage/page.js` | LP-033: แท็บ Usage ค้างเมื่อ hard-load ด้วย `?tab=` → ใช้ `history.pushState` แทน `router.push` (บั๊ก upstream เดิม) | ACTIVE (deploy แล้ว) |
 | `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -1217,7 +1217,7 @@ Rollback: `cp ~/.9router/com.9router.autostart.plist.bak-20261003 ~/Library/Laun
 
 **Tests:** `tests/unit/responses-abort-terminal.test.js` +1 (stall ผ่าน `pipeWithDisconnect` 50ms → `console.warn` มี `chunks=1 | bytes=10 | sinceLast | dur`) — แดงกับโค้ดเดิม
 **Validation (2026-10-04):** full suite เทียบรายข้อกับ HEAD เดิม: ไม่มี fail ใหม่ (100 fail เท่าเดิม, pass +1) · eslint ผ่าน
-**Deploy:** ยังไม่ทำ — ผู้ใช้ขอให้รอสั่งก่อนรีสตาร์ต (ติดตั้ง global ตอน server รันอยู่ไม่ได้ เพราะ chunk ของ Next จะไม่ตรงกับ process ที่รัน)
+**Deploy:** 2026-10-04 13:33 พร้อม LP-036 (bootout → `npm install --global ./9router-0.5.95.tgz` → bootstrap, `/api/health` ok) — ยังไม่เจอ stall จริงหลัง deploy ให้ดูบรรทัดนี้ใน `server.log` รอบหน้า
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เปลี่ยน log ของ stall ใน `pipeWithDisconnect` ให้พิมพ์ใน production เอง → UPSTREAM_FIXED
 
@@ -1239,7 +1239,7 @@ request ที่ cache 0 ใช้เวลานานกว่า (13–20 �
 
 **Tests:** `tests/unit/muse-direct-responses.test.js` +3 (key จาก session ของ Claude Code / เก็บ key ที่ client ส่งเอง / fallback คงที่ต่อ connection) — 2 ข้อแดงกับโค้ดเดิม
 **Validation (2026-10-04):** full suite เทียบรายข้อ: ไม่มี fail ใหม่ (100 fail เท่าเดิม, pass +3) · eslint ผ่าน
-**Deploy:** ยังไม่ทำ — รอผู้ใช้สั่ง (รวมรอบเดียวกับ LP-035) · ยืนยันหลัง deploy: แท็บ Sessions › Detail ของ session ใหม่ที่ใช้ muse → Cached/Input ควร ≥ ~90% และไม่มีแถว cached 0 ติดกันเป็นชุด
+**Deploy:** 2026-10-04 13:33 พร้อม LP-035 · **ยืนยัน live:** ยิง `/v1/messages` (system ~10.4K token) ซ้ำ 4 ครั้งด้วย `x-claude-code-session-id` เดียวกัน → ครั้งแรก cached 0 (สร้าง cache), ครั้งที่ 2–4 cached 10,353/10,424 (99%) ทุกครั้ง · ที่ยังต้องดู: session Claude Code จริงที่ใช้ muse ใน Sessions › Detail ควร ≥ ~90%
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream ใส่ `prompt_cache_key` ให้ muse (หรือ DefaultExecutor) เอง → UPSTREAM_FIXED · provider อื่นที่เป็น Responses แต่ไม่ใช่ Codex อาจมีปัญหาเดียวกัน (ยังไม่ได้วัด)
 

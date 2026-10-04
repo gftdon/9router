@@ -17,6 +17,9 @@ node scripts/local/session-analysis/collect.mjs \
   the script then exports those rows and the window of
   `~/.9router/logs/server*.log` covering the session.
 - Put the setup in the label (`9router-orch-opus55-dr-sol-fw-muse`), since the combo can change after the run.
+- `--until <iso>` / `--since <iso>` limit the analysis to a window. Use `--until` when the task finished but the
+  session stayed open (later lead messages would otherwise stretch wall clock), and `--since` when one session held
+  an earlier task. Entries, subagents and gateway rows outside the window are ignored; the window is shown in `summary.md`.
 
 Output goes to `analysis/runs/<label>/` (`analysis/` is in `.git/info/exclude`):
 
@@ -38,7 +41,7 @@ node scripts/local/session-analysis/compare.mjs analysis/runs/<a> analysis/runs/
 ## Caveats
 
 - Re-run `collect.mjs` once a session has really finished; a still-running session is a snapshot.
-- Gateway log errors are gateway-wide for the window. Requests/fallbacks are attributed to the session's combos
+- Gateway log errors count one per failure (`✗ ERROR` / `❌` lines) and are gateway-wide for the window. Requests/fallbacks are attributed to the session's combos
   (from `settings.json` `ANTHROPIC_*_MODEL`), but another session using the same combo at the same time is counted too.
 - `usageHistory` per-session rows are exact (keyed by Claude session id).
 - Stall details (`STALL TIMEOUT … chunks= bytes=`) only appear in logs from builds with LP-035.

@@ -7,7 +7,7 @@
 // Usage:
 //   node scripts/local/session-analysis/collect.mjs --session <uuid> --label <name> \
 //        [--out analysis/runs] [--projects ~/.claude/projects] [--router-db ~/.9router/db/data.sqlite] \
-//        [--router-log ~/.9router/logs] [--settings <claude settings.json>]
+//        [--router-log ~/.9router/logs] [--settings <claude settings.json>] [--since <iso>] [--until <iso>]
 //
 // Read-only: transcripts, the 9router SQLite DB (sqlite3 -readonly) and log files.
 // Writes only into <out>/<label>/. No prompt bodies are copied — only counts,
@@ -20,7 +20,7 @@ import { execFileSync } from "node:child_process";
 const HOME = os.homedir();
 const args = parseArgs(process.argv.slice(2));
 if (!args.session || !args.label) {
-  console.error("usage: collect.mjs --session <uuid> --label <name> [--out analysis/runs]");
+  console.error("usage: collect.mjs --session <uuid> --label <name> [--since <iso>] [--until <iso>] [--out analysis/runs]");
   process.exit(2);
 }
 const SESSION = args.session;
@@ -29,6 +29,11 @@ const ROUTER_DB = expand(args["router-db"] || "~/.9router/db/data.sqlite");
 const ROUTER_LOG_DIR = expand(args["router-log"] || "~/.9router/logs");
 const OUT = path.resolve(args.out || "analysis/runs", args.label);
 const EXCERPT = 600;
+// Optional analysis window (ISO or anything Date parses): cut a session that kept
+// running after the task ended, or that held an earlier task.
+const SINCE = args.since ? new Date(args.since).toISOString() : null;
+const UNTIL = args.until ? new Date(args.until).toISOString() : null;
+const inWindow = (ts) => !ts || ((!SINCE || ts >= SINCE) && (!UNTIL || ts <= UNTIL));
 
 function parseArgs(argv) {
   const o = {};
@@ -48,7 +53,9 @@ function readJsonl(file) {
   const out = [];
   for (const line of fs.readFileSync(file, "utf8").split("\n")) {
     if (!line.trim()) continue;
-    try { out.push(JSON.parse(line)); } catch { /* skip partial line */ }
+    let e;
+    try { e = JSON.parse(line); } catch { continue; /* skip partial line */ }
+    if (inWindow(e.timestamp)) out.push(e);
   }
   return out;
 }
@@ -184,7 +191,7 @@ function routerUsage(sessionId) {
   const rows = sqliteJson(`SELECT timestamp, provider, model, connectionId, promptTokens, completionTokens, cost, tokens, meta
     FROM usageHistory WHERE sessionId = 'claude:${sessionId.replace(/'/g, "")}' ORDER BY timestamp`);
   if (!Array.isArray(rows)) return { rows: [], error: rows?.error || "no router db" };
-  return { rows: rows.map((r) => {
+  return { rows: rows.filter((r) => inWindow(r.timestamp)).map((r) => {
     const t = safeJson(r.tokens), m = safeJson(r.meta);
     return { timestamp: r.timestamp, provider: r.provider, model: r.model, prompt: r.promptTokens, completion: r.completionTokens,
       cached: t.cached_tokens || 0, cacheCreation: t.cache_creation_input_tokens || 0, reasoning: t.reasoning_tokens || 0,
@@ -245,8 +252,11 @@ function summariseRouterLog(lines, combos) {
     if (p && (!combos.size || combos.has(p[1]))) s.requests++;
     const t = /\[COMBO\] Trying model (\d+)\/\d+: (\S+)/.exec(l);
     if (t && (!combos.size || combos.has(combo))) { s.comboTries[t[2]] = (s.comboTries[t[2]] || 0) + 1; if (t[1] !== "1") s.fallbacks++; }
-    if (/✗ ERROR|STALL TIMEOUT|Failed to convert/.test(l)) { s.errors++; s.errorLines.push(l.slice(0, 300)); }
-    if (l.includes("stream stall timeout")) s.stallTimeouts++;
+    // Count one per failure: "✗ ERROR" (request line) or "❌" (provider error); a stall also prints a
+    // STALL TIMEOUT detail line (LP-035) and "Failed to convert" repeats across [AUTH]/[CHAT] lines.
+    if (/✗ ERROR|❌/.test(l)) s.errors++;
+    if (/✗ ERROR|❌|STALL TIMEOUT/.test(l)) s.errorLines.push(l.slice(0, 300));
+    if (l.includes("✗ ERROR: stream stall timeout")) s.stallTimeouts++;
   }
   s.errorLines = s.errorLines.slice(0, 50);
   return s;
@@ -305,7 +315,9 @@ const subs = [];
 if (fs.existsSync(subDir)) {
   for (const f of fs.readdirSync(subDir).filter((n) => n.endsWith(".jsonl"))) {
     const meta = safeJson(fs.existsSync(path.join(subDir, f.replace(/\.jsonl$/, ".meta.json"))) ? fs.readFileSync(path.join(subDir, f.replace(/\.jsonl$/, ".meta.json")), "utf8") : "{}");
-    subs.push({ ...analyseAgent(readJsonl(path.join(subDir, f)), { name: f.replace(/\.jsonl$/, ""), agentType: meta.agentType || "?", description: meta.description || "" }), meta });
+    const entries = readJsonl(path.join(subDir, f));
+    if (!entries.some((e) => e.timestamp)) continue; // entirely outside the window
+    subs.push({ ...analyseAgent(entries, { name: f.replace(/\.jsonl$/, ""), agentType: meta.agentType || "?", description: meta.description || "" }), meta });
   }
 }
 subs.sort((a, b) => String(a.start).localeCompare(String(b.start)));
@@ -338,7 +350,7 @@ const errLines = usedRouter ? routerLogWindow(path.join(ROUTER_LOG_DIR, "server.
 
 const summary = {
   label: args.label, sessionId: SESSION, titles, claudeCodeVersion: version, cwd,
-  collectedAt: new Date().toISOString(), transcript: file,
+  collectedAt: new Date().toISOString(), transcript: file, window: { since: SINCE, until: UNTIL },
   start, end, wallMs: ms(start, end), mainIdleMs: idleMs, mainWaitingForAgentsMs: waitAgentsMs, activeMs: ms(start, end) - idleMs,
   via9router: usedRouter,
   agents: { count: subs.length, maxConcurrent: maxCon, byType: subs.reduce((o, s) => ((o[s.agentType] = (o[s.agentType] || 0) + 1), o), {}) },
@@ -380,6 +392,7 @@ function renderMd(s) {
   const L = [];
   L.push(`# ${s.label} — session ${s.sessionId}`, "");
   L.push(`- Title(s): ${s.titles.join(", ") || "-"} · Claude Code ${s.claudeCodeVersion || "?"} · via 9router: **${s.via9router ? "yes" : "no"}**`);
+  if (s.window.since || s.window.until) L.push(`- Analysis window: ${s.window.since || "session start"} → ${s.window.until || "session end"} (entries outside are ignored)`);
   L.push(`- cwd: \`${s.cwd}\``);
   L.push(`- Wall: **${fmtDur(s.wallMs)}** (${s.start} → ${s.end}) · main waiting for the human: ${fmtDur(s.mainIdleMs)} · main idle until background agents reported: ${fmtDur(s.mainWaitingForAgentsMs)} · wall minus human wait: **${fmtDur(s.activeMs)}**`);
   L.push(`- API calls: ${s.totals.apiCalls} · model time (sum, overlaps across agents): ${fmtDur(s.totals.modelMs)} · tool time: ${fmtDur(s.totals.toolMs)} · tool calls: ${s.totals.toolCalls} (errors ${s.totals.toolErrors}) · API error msgs: ${s.totals.apiErrorMessages}`);

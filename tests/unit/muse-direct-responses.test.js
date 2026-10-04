@@ -18,13 +18,13 @@ vi.mock("@/lib/usageDb.js", () => ({
 
 const MODEL = "muse-spark-1.3-contributor";
 
-async function captureWire({ endpoint, body, model = MODEL, provider = "muse", credentials = { accessToken: "test-token", providerSpecificData: {} } }) {
+async function captureWire({ endpoint, body, model = MODEL, provider = "muse", credentials = { accessToken: "test-token", providerSpecificData: {} }, headers = {} }) {
   const { handleChatCore } = await import("../../open-sse/handlers/chatCore.js");
   await handleChatCore({
     body: structuredClone(body),
     modelInfo: { provider, model },
     credentials,
-    clientRawRequest: { endpoint, body, headers: {} },
+    clientRawRequest: { endpoint, body, headers },
     // /v1/messages pins the source format in the real route; mirror it.
     sourceFormatOverride: endpoint === "/v1/messages" ? "claude" : undefined,
     connectionId: "test-connection",
@@ -205,5 +205,33 @@ describe("muse direct provider non-stream clients", () => {
     const json = await nonStream("/v1/chat/completions", { ...openaiBody(), stream: false });
     expect(json.object).toBe("chat.completion");
     expect(json.choices[0].message.content).toBe("hi");
+  });
+});
+
+// LP-036: without prompt_cache_key Muse spreads requests across cache nodes
+// (a Claude Code session hit 0% cache on ~45% of requests).
+describe("muse direct provider prompt cache key", () => {
+  const UUID = "4f9a2b1c-1111-2222-3333-444455556666";
+
+  it("derives prompt_cache_key from the Claude Code session id", async () => {
+    const wire = await captureWire({ endpoint: "/v1/messages", body: claudeBody(), headers: { "x-claude-code-session-id": UUID } });
+    expect(wire.body.prompt_cache_key).toBe(`claude:${UUID}`);
+  });
+
+  it("keeps a prompt_cache_key the client sent", async () => {
+    const body = { model: MODEL, input: "hi", prompt_cache_key: "client-key" };
+    const wire = await captureWire({ endpoint: "/v1/responses", body });
+    expect(wire.body.prompt_cache_key).toBe("client-key");
+  });
+
+  it("falls back to a stable key when the client sends no session", async () => {
+    // Real credentials carry connectionId (src/sse/services/auth.js) — the per-connection fallback keys on it.
+    const credentials = () => ({ accessToken: "test-token", providerSpecificData: {}, connectionId: "conn-muse-1" });
+    const first = await captureWire({ endpoint: "/v1/chat/completions", body: openaiBody(), credentials: credentials() });
+    fetchMock.mockClear();
+    const second = await captureWire({ endpoint: "/v1/chat/completions", body: openaiBody(), credentials: credentials() });
+    expect(typeof first.body.prompt_cache_key).toBe("string");
+    expect(first.body.prompt_cache_key.length).toBeGreaterThan(0);
+    expect(second.body.prompt_cache_key).toBe(first.body.prompt_cache_key);
   });
 });

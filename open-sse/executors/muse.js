@@ -1,6 +1,7 @@
 import { DefaultExecutor } from "./default.js";
 import { isMuseSparkModel } from "../providers/models/helpers.js";
 import { capToolSchemasDepth } from "../utils/museSparkToolSchema.js";
+import { resolveSessionId } from "../utils/sessionManager.js";
 
 // Muse (Meta Model API). Every model is pinned to /v1/responses, which rejects
 // the Chat-style top-level `reasoning_effort` with HTTP 400 "unknown parameter"
@@ -22,6 +23,17 @@ export class MuseExecutor extends DefaultExecutor {
       if (!out.reasoning.summary) out.reasoning.summary = "auto";
     }
     delete out.reasoning_effort;
+    // Without a prompt_cache_key Muse routes requests to arbitrary cache nodes:
+    // a Claude Code session hit 0% cache on ~45% of requests (measured: same
+    // prompt 8x → 1/8 cached without a key, 7/8 with one). Same scheme as Codex.
+    if (!out.prompt_cache_key) {
+      out.prompt_cache_key = resolveSessionId({
+        headers: credentials?.rawHeaders,
+        body: out,
+        connectionId: credentials?.connectionId,
+        scope: "muse",
+      });
+    }
     // Muse Spark 400s any tool schema nested past 10 levels (LP-013).
     if (isMuseSparkModel(model || out.model)) capToolSchemasDepth(out.tools);
     return out;

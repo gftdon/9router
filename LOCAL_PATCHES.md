@@ -8,9 +8,9 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-036 + เอกสาร + `scripts/local/session-analysis` (2026-10-04) |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `26267bb5` (LP-017..LP-036) — ติดตั้ง 2026-10-04 13:33 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp035-036-20261004/`) |
-| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-04 13:33 (bootout + bootstrap) |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-037 + เอกสาร + `scripts/local/session-analysis` (2026-10-04) |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `1271470a` (LP-017..LP-037) — ติดตั้ง 2026-10-04 21:57 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp037-20261004/`) |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-04 21:57 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -25,7 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
-| `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE (commit แล้ว ยังไม่ deploy) |
+| `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE (deploy 2026-10-04 21:57) |
 | `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE |
 | `63a96737` | `open-sse/utils/streamHandler.js` | LP-035: บรรทัด `STALL TIMEOUT … chunks/bytes/sinceLast` พิมพ์เสมอ (เดิมผ่าน `dbg()` ที่ทำงานเฉพาะ dev) | ACTIVE |
 | — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (apply + ยืนยัน live แล้ว) |
@@ -1267,7 +1267,7 @@ request ที่ cache 0 ใช้เวลานานกว่า (13–20 �
 
 **Tests:** `tests/unit/passthrough-suffix-thinking.test.js` +13 (Claude wire: high/medium/none/xhigh clamp/Fable/Haiku budget/เก็บ output_config+display/ไม่มี suffix · anthropic + anthropic-compatible · gemini-cli envelope + ไม่แก้ body ต้นฉบับ · ข้าม Claude บน antigravity · ข้าม wire อื่น · ผ่าน chatCore จริง 2 ข้อ) — ข้อ chatCore แดงกับโค้ดเดิม
 **Validation (2026-10-04):** full suite เทียบรายข้อกับโค้ดก่อนแก้: ไม่มี fail ใหม่ (100 fail เท่าเดิม, 3,263 → 3,276 tests) · eslint ผ่าน · (`verify-no-regression.mjs` อ่าน JSON ของ vitest 4 ไม่ได้ — ชื่อไฟล์เป็น `undefined` — จึงเทียบด้วยการรัน suite สองรอบแทน)
-**Deploy:** ยังไม่ทำ — รอผู้ใช้สั่ง · ยืนยันหลัง deploy: log ของ `cc/…(high)` ต้องขึ้น `THINK:high` แทน `THINK:32k`
+**Deploy:** 2026-10-04 21:57 (bootout → `npm install --global ./9router-0.5.95.tgz` → bootstrap, health ok) · ยืนยันใน log จริงด้วย request แบบ Claude Code (`thinking` budget 31999): `cc/claude-opus-5-5(high)` → `THINK:high`, ส่วน `cc/claude-opus-5-5` (ไม่มี suffix) ยังเป็น `THINK:32k` ตามเดิม · ตอนทดสอบ upstream Claude ตอบ 429 `rate_limit_error` ทั้งสองแบบ (บัญชีโดน rate limit ไม่เกี่ยวกับ patch) จึงยังไม่ได้เห็น response 200 ของ `(high)` — ดูจาก session ถัดไป
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream ใส่ suffix thinking ใน passthrough เอง (ดู block `if (passthrough)` ใน `chatCore.js`) → UPSTREAM_FIXED · ถ้า upstream เปลี่ยนชื่อ/signature ของ `resolveFormat`/`applyThinking` ต้องปรับ `passthroughThinking.js`
 

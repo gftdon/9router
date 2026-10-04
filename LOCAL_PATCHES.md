@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `63a96737` | `open-sse/utils/streamHandler.js` | LP-035: บรรทัด `STALL TIMEOUT … chunks/bytes/sinceLast` พิมพ์เสมอ (เดิมผ่าน `dbg()` ที่ทำงานเฉพาะ dev) | ACTIVE (commit แล้ว ยังไม่ deploy) |
 | — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (apply + ยืนยัน live แล้ว) |
 | `f356ce30` | `src/app/(dashboard)/dashboard/usage/page.js` | LP-033: แท็บ Usage ค้างเมื่อ hard-load ด้วย `?tab=` → ใช้ `history.pushState` แทน `router.push` (บั๊ก upstream เดิม) | ACTIVE (deploy แล้ว) |
 | `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -1197,6 +1198,27 @@ Rollback: `cp ~/.9router/com.9router.autostart.plist.bak-20261003 ~/Library/Laun
 - **เมนู tray "Enable Auto-start"** (`cli/src/cli/tray/autostart.js` `enableMacOS`) **เขียน plist ใหม่ทับ** — กลับเป็น `--tray --skip-update` + log `/tmp` → ถ้ากด Disable/Enable Auto-start ต้องใส่ LP-034 กลับ
 - ถ้า upstream เปลี่ยนชื่อ/ความหมายของ `--log` ใน `cli.js` หรือเพิ่ม log file ของตัวเอง → เทียบแล้วพิจารณา UPSTREAM_FIXED (ถอด `--log` + ตัวหมุน log)
 - การอัปเดต npm global (`npm install --global ./9router-*.tgz`) ไม่แตะ plist — ไม่ต้องทำอะไร
+
+---
+
+## LP-035: stream stall timeout ไม่บอกว่า upstream ส่งมาถึงไหนก่อนเงียบ
+
+**Status:** ACTIVE · **Commit:** `63a96737` · **Implemented:** 2026-10-04 · ต่อจาก LP-034 (log ใหม่เห็น error แล้วแต่ไม่มีรายละเอียด)
+
+**อาการ:** 2026-10-03 21:53:50 fast-worker ใน session MaeModAI (`claude:00ca4929…`) → `muse/muse-spark-1.3-contributor(max)` ได้ HTTP 200 แล้วเงียบ → log มีแค่
+`✗ ERROR: stream stall timeout · muse/… · 384312ms` + stack ของ timer (ไม่บอกอะไร) — muse ไม่ส่ง error มาเลย จึงไม่มี body ให้ดู
+(งานไม่เสีย: request ที่ค้างเป็นตัวที่ยิงขนาน — fast-worker ส่ง DONE ไปแล้ว 21:47:44) · น่าจะเป็นอาการเดียวกับ "Failed to convert streaming response to JSON" ที่เจอก่อนหน้า (upstream เงียบกลาง stream)
+**Root cause (ของการไม่มีรายละเอียด):** `pipeWithDisconnect` (`streamHandler.js:211`) มีบรรทัด `STALL TIMEOUT … | chunks | bytes | sinceLast` อยู่แล้ว แต่ส่งผ่าน `dbg()` ซึ่งทำงานเฉพาะ `NODE_ENV !== "production"` (`debugLog.js:3`) → gateway จริงไม่พิมพ์
+**แก้:** เปลี่ยนเฉพาะบรรทัดนั้นเป็น `console.warn` รูปแบบเดียวกับ log อื่น + เพิ่ม `dur` → ไปลง `~/.9router/logs/server.error.log` (stderr, LP-034):
+`[HH:MM:SS] ⚠️  [STREAM] STALL TIMEOUT 360000ms | chunks=N | bytes=N | sinceLast=Nms | dur=Nms`
+อ่านคู่กับบรรทัด `✗ ERROR: stream stall timeout · <provider>/<model>` ที่เวลาเดียวกันใน `server.log` · `dbg` อื่นในไฟล์ไม่แตะ
+ไม่ได้เปลี่ยนเวลา timeout (`STREAM_STALL_TIMEOUT_MS` = 360 วิ เดิม)
+
+**Tests:** `tests/unit/responses-abort-terminal.test.js` +1 (stall ผ่าน `pipeWithDisconnect` 50ms → `console.warn` มี `chunks=1 | bytes=10 | sinceLast | dur`) — แดงกับโค้ดเดิม
+**Validation (2026-10-04):** full suite เทียบรายข้อกับ HEAD เดิม: ไม่มี fail ใหม่ (100 fail เท่าเดิม, pass +1) · eslint ผ่าน
+**Deploy:** ยังไม่ทำ — ผู้ใช้ขอให้รอสั่งก่อนรีสตาร์ต (ติดตั้ง global ตอน server รันอยู่ไม่ได้ เพราะ chunk ของ Next จะไม่ตรงกับ process ที่รัน)
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เปลี่ยน log ของ stall ใน `pipeWithDisconnect` ให้พิมพ์ใน production เอง → UPSTREAM_FIXED
 
 ---
 

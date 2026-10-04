@@ -137,7 +137,15 @@ function restoreCombos() {
 // ---------- run ----------
 const tmuxName = (run) => `mmb-${run.replace(/[^A-Za-z0-9_-]/g, "_")}`;
 const metaPath = (run) => path.join(RUNS, `${run}.json`);
-const transcriptPath = (meta) => path.join(os.homedir(), ".claude/projects", meta.runDir.replace(/[^A-Za-z0-9]/g, "-"), `${meta.sessionId}.jsonl`);
+// The transcript starts under the run dir's project folder and moves to the worktree's folder
+// (…--claude-worktrees-<name>) once the session enters a worktree — look in every folder of the run.
+function transcriptPath(meta) {
+  const projects = path.join(os.homedir(), ".claude/projects");
+  const prefix = meta.runDir.replace(/[^A-Za-z0-9]/g, "-");
+  const dirs = fs.existsSync(projects) ? fs.readdirSync(projects).filter((d) => d === prefix || d.startsWith(prefix + "-")) : [];
+  for (const d of dirs) { const f = path.join(projects, d, `${meta.sessionId}.jsonl`); if (fs.existsSync(f)) return f; }
+  return path.join(projects, prefix, `${meta.sessionId}.jsonl`);
+}
 const capture = (sess) => shOk("tmux", ["capture-pane", "-p", "-t", sess]).stdout || "";
 
 function claudeBin() {
@@ -184,7 +192,8 @@ async function launch(id) {
   for (let i = 0; i < 60 && !ready; i++) {
     await sleep(1000);
     const screen = capture(sess);
-    if (/trust (the files in )?this folder|Do you trust/i.test(screen)) { shOk("tmux", ["send-keys", "-t", sess, "Enter"]); await sleep(1500); continue; }
+    // The trust dialog defaults to "No, exit" — move to "Yes, I trust this folder" first.
+    if (/Yes, I trust this folder/i.test(screen)) { shOk("tmux", ["send-keys", "-t", sess, "Down"]); await sleep(300); shOk("tmux", ["send-keys", "-t", sess, "Enter"]); await sleep(2000); continue; }
     if (/Bypass Permissions mode/i.test(screen) && /Yes, I accept/i.test(screen)) { log("bypass confirmation dialog is open — answer it in tmux, then the watcher continues"); }
     if (/for shortcuts|auto mode|bypass permissions on|accept edits|\? for/i.test(screen)) ready = true;
   }

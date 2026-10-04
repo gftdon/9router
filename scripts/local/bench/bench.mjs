@@ -12,6 +12,7 @@
 //   node scripts/local/bench/bench.mjs run <id> [--tag r2] [--bypass]   copy template, launch Claude Code in tmux, paste packet, watch, score
 //   node scripts/local/bench/bench.mjs watch <run>             (re)attach the watcher to a launched run
 //   node scripts/local/bench/bench.mjs score <run>             hidden tests + scope + process checks
+//   node scripts/local/bench/bench.mjs batch <id...|all> [--from <id>] [--restore]   run several ids in order (one at a time)
 //   node scripts/local/bench/bench.mjs report                  table of all scored runs
 //   node scripts/local/bench/bench.mjs stop <run>              kill the run's tmux session
 //
@@ -177,12 +178,18 @@ async function launch(id) {
     const s = readJson(SETTINGS_9R);
     if (!s?.env?.ANTHROPIC_BASE_URL) die(`${SETTINGS_9R} has no env.ANTHROPIC_BASE_URL`);
     env.ANTHROPIC_BASE_URL = s.env.ANTHROPIC_BASE_URL;
+    // Same as launching claude9 from a shell that exports the token: with the token in the process
+    // env Claude Code skips the claude.ai connectors (~240 MCP tools, inlined while ENABLE_TOOL_SEARCH=false).
+    if (s.env.ANTHROPIC_AUTH_TOKEN) env.ANTHROPIC_AUTH_TOKEN = s.env.ANTHROPIC_AUTH_TOKEN;
     args.push("--settings", SETTINGS_9R);
   }
   if (flags.bypass) args.push("--dangerously-skip-permissions");
-  const cmd = `env -i ${Object.entries(env).map(([k, v]) => `${k}=${q(v)}`).join(" ")} ${args.map(q).join(" ")}`;
+  // Values (incl. the gateway token) go through a 0700 launch file, never through tmux/ps argv;
+  // the file removes itself before exec'ing Claude Code.
+  const launchFile = path.join(RUNS, `.${run}.launch.sh`);
+  fs.writeFileSync(launchFile, `#!/bin/sh\nrm -f ${q(launchFile)}\nexec env -i ${Object.entries(env).map(([k, v]) => `${k}=${q(v)}`).join(" ")} ${args.map(q).join(" ")}\n`, { mode: 0o700 });
   shOk("tmux", ["kill-session", "-t", sess]);
-  sh("tmux", ["new-session", "-d", "-s", sess, "-x", "220", "-y", "60", "-c", runDir, cmd]);
+  sh("tmux", ["new-session", "-d", "-s", sess, "-x", "220", "-y", "60", "-c", runDir, `/bin/sh ${q(launchFile)}`]);
   const meta = { run, id, native: !!entry.native, bypass: !!flags.bypass, runDir, sessionId, tmux: sess, launchedAt: now(), combos, entry };
   writeJson(metaPath(run), meta);
   log(`tmux ${sess} · session ${sessionId} — watch live: tmux attach -t ${sess} (detach: Ctrl-b d)`);
@@ -293,7 +300,13 @@ function score(run) {
   const outside = changed.filter((f) => !allowed.some((re) => re.test(f)));
   const banned = changed.filter((f) => prohibited.some((re) => re.test(f)));
   const sources = changed.filter((f) => !/(^|\/)test\/|\.test\.ts$|^BENCH_RESULT\.md$/.test(f));
-  const copyOnly = sources.every((f) => CFG.scope.copyOnlySources.includes(f));
+  // A source file outside the copy tables still counts as copy-only when its diff only touches comments.
+  const commentOnly = (f) => {
+    const d = shOk("git", ["-C", wt.path, "diff", base, "--unified=0", "--", f]).stdout || "";
+    const lines = d.split("\n").filter((l) => /^[+-](?![+-])/.test(l)).map((l) => l.slice(1).trim()).filter(Boolean);
+    return lines.length > 0 && lines.every((l) => /^(\/\/|\/\*|\*)/.test(l));
+  };
+  const copyOnly = sources.every((f) => CFG.scope.copyOnlySources.includes(f) || commentOnly(f));
   const benchResult = fs.existsSync(path.join(wt.path, "BENCH_RESULT.md"));
 
   // Hidden tests: the reference solution's tests, dropped into a scratch copy of the run's tree.
@@ -373,6 +386,19 @@ switch (cmd) {
   case "restore-combos": restoreCombos(); break;
   case "run": { const run = await launch(arg || die("usage: run <id>")); await watch(run); break; }
   case "watch": await watch(arg || die("usage: watch <run>")); break;
+  case "batch": {
+    let ids = pos.slice(1).includes("all") ? CFG.matrix.map((m) => m.id) : pos.slice(1);
+    if (flags.from) ids = ids.slice(Math.max(0, ids.indexOf(flags.from)));
+    if (!ids.length) die("usage: batch <id...|all> [--from <id>] [--restore]");
+    log(`batch: ${ids.join(" ")}`);
+    for (const id of ids) {
+      try { const run = await launch(id); await watch(run); }
+      catch (e) { log(`${id}: batch step failed — ${e.message}`); }
+    }
+    if (flags.restore) restoreCombos();
+    report();
+    break;
+  }
   case "score": score(arg || die("usage: score <run>")); break;
   case "report": report(); break;
   case "stop": { const m = readJson(metaPath(arg)) || die(`no run ${arg}`); shOk("tmux", ["kill-session", "-t", m.tmux]); log(`stopped ${m.tmux}`); break; }

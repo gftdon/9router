@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE (commit แล้ว ยังไม่ deploy) |
 | `63a96737` | `open-sse/utils/streamHandler.js` | LP-035: บรรทัด `STALL TIMEOUT … chunks/bytes/sinceLast` พิมพ์เสมอ (เดิมผ่าน `dbg()` ที่ทำงานเฉพาะ dev) | ACTIVE (commit แล้ว ยังไม่ deploy) |
 | — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (apply + ยืนยัน live แล้ว) |
 | `f356ce30` | `src/app/(dashboard)/dashboard/usage/page.js` | LP-033: แท็บ Usage ค้างเมื่อ hard-load ด้วย `?tab=` → ใช้ `history.pushState` แทน `router.push` (บั๊ก upstream เดิม) | ACTIVE (deploy แล้ว) |
@@ -1219,6 +1220,28 @@ Rollback: `cp ~/.9router/com.9router.autostart.plist.bak-20261003 ~/Library/Laun
 **Deploy:** ยังไม่ทำ — ผู้ใช้ขอให้รอสั่งก่อนรีสตาร์ต (ติดตั้ง global ตอน server รันอยู่ไม่ได้ เพราะ chunk ของ Next จะไม่ตรงกับ process ที่รัน)
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เปลี่ยน log ของ stall ใน `pipeWithDisconnect` ให้พิมพ์ใน production เอง → UPSTREAM_FIXED
+
+---
+
+## LP-036: Muse Spark cache ต่ำ (~52%) เพราะไม่ได้ส่ง `prompt_cache_key`
+
+**Status:** ACTIVE · **Commit:** `26267bb5` · **Implemented:** 2026-10-04 · พบจากแท็บ Sessions (LP-032)
+
+**อาการ:** session MaeModAI `claude:00ca4929…` — `muse-spark-1.3-contributor(max)` 630 requests: input 177.8M, cached 93.0M (**52%**) ขณะที่ปกติควร 90%+
+แยกราย request แล้วเป็นสองขั้ว: 261 ครั้ง ≥90%, 82 ครั้ง 50–90%, **287 ครั้ง = 0 พอดี** สลับกันไปมา (บัญชี muse มีบัญชีเดียว → ไม่ใช่การสลับบัญชี)
+request ที่ cache 0 ใช้เวลานานกว่า (13–20 วิ เทียบ 5–8 วิ) และเสียเงินเต็มราคา input
+**Root cause:** Muse (Meta Model API, `/v1/responses`) กระจาย request ไปหลาย cache node ถ้าไม่มี `prompt_cache_key` ช่วยปักให้ไปที่เดิม
+`CodexExecutor` ใส่ `prompt_cache_key` ให้เอง (`codex.js:478`) แต่ `MuseExecutor` ไม่ได้ใส่ · billing header ของ Claude Code (`cch=` ที่เปลี่ยนทุก request) ถูกตัดอยู่แล้ว (`claude-to-openai.js:10`) จึงไม่ใช่สาเหตุ
+**พิสูจน์ (2026-10-04, ผ่าน gateway จริง):** prompt เดิม ~12.4K token ยิง 8 ครั้งติดกัน → **ไม่มี key: cached 1/8** · **มี key: cached 7/8** (ครั้งแรกเป็นการเขียน cache)
+**แก้:** `MuseExecutor.transformRequest` ใส่ `prompt_cache_key = resolveSessionId({ headers: credentials.rawHeaders, body, connectionId, scope: "muse" })` เมื่อ client ไม่ได้ส่งมาเอง
+(Claude Code → `claude:<uuid>` จาก `x-claude-code-session-id`; ไม่มี session → key คงที่ต่อ connection) — วิธีเดียวกับ Codex
+**ความปลอดภัย:** key คือ session UUID แบบสุ่มของ Claude Code (Codex ส่งแบบเดียวกันอยู่แล้ว) ไม่ใช่ credential และไม่มีข้อมูลส่วนตัว
+
+**Tests:** `tests/unit/muse-direct-responses.test.js` +3 (key จาก session ของ Claude Code / เก็บ key ที่ client ส่งเอง / fallback คงที่ต่อ connection) — 2 ข้อแดงกับโค้ดเดิม
+**Validation (2026-10-04):** full suite เทียบรายข้อ: ไม่มี fail ใหม่ (100 fail เท่าเดิม, pass +3) · eslint ผ่าน
+**Deploy:** ยังไม่ทำ — รอผู้ใช้สั่ง (รวมรอบเดียวกับ LP-035) · ยืนยันหลัง deploy: แท็บ Sessions › Detail ของ session ใหม่ที่ใช้ muse → Cached/Input ควร ≥ ~90% และไม่มีแถว cached 0 ติดกันเป็นชุด
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream ใส่ `prompt_cache_key` ให้ muse (หรือ DefaultExecutor) เอง → UPSTREAM_FIXED · provider อื่นที่เป็น Responses แต่ไม่ใช่ Codex อาจมีปัญหาเดียวกัน (ยังไม่ได้วัด)
 
 ---
 

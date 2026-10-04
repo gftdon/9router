@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createDisconnectAwareStream, pipeWithDisconnect, createStreamController } from "../../open-sse/utils/streamHandler.js";
 import { buildAbortedResponsesTerminalBytes } from "../../open-sse/utils/responsesStreamHelpers.js";
@@ -138,5 +138,27 @@ describe("stall abort through pipeWithDisconnect", () => {
     expect(seen).toBe("stream stall timeout");
     expect(text).toContain('"stream stall timeout"');
     expect(text).toContain("data: [DONE]");
+  });
+
+  // LP-035: the STALL line must reach production logs (dbg is dev-only) with
+  // how far the stream got before the upstream went silent.
+  it("always logs the stall with chunk/byte counts", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const ctrl = createStreamController({ provider: "muse", model: "test" });
+      const upstream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("data: hi\n\n"));
+          ctrl.signal.addEventListener("abort", () => controller.error(new Error("aborted")), { once: true });
+        },
+      });
+      await readAll(pipeWithDisconnect({ body: upstream }, new TransformStream(), ctrl, null, 50));
+
+      const line = warn.mock.calls.map((c) => String(c[0])).find((l) => l.includes("STALL TIMEOUT"));
+      expect(line).toBeDefined();
+      expect(line).toMatch(/STALL TIMEOUT 50ms \| chunks=1 \| bytes=10 \| sinceLast=\d+ms \| dur=\d+ms/);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

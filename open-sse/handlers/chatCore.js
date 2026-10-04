@@ -1,6 +1,7 @@
 import { detectFormat, getTargetFormat, resolveTransport } from "../services/provider.js";
 import { translateRequest } from "../translator/index.js";
 import { applyThinking, extractThinking, stripThinkingSuffix } from "../translator/concerns/thinkingUnified.js";
+import { applyPassthroughSuffixThinking } from "../translator/concerns/passthroughThinking.js";
 import { FORMATS } from "../translator/formats.js";
 import { normalizeClaudePassthrough, anchorClaudeCache, isInvalidThinkingSignatureError, stripThinkingForSignatureRetry } from "../translator/formats/claude.js";
 import { createStreamController } from "../utils/streamHandler.js";
@@ -209,6 +210,11 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
         };
         delete translatedBody.reasoning_effort;
       }
+    } else {
+      // LP-037: honour the combo suffix (e.g. cc/claude-opus-5-5(high)) — before
+      // normalizeClaudePassthrough so its adaptive downgrade still applies.
+      const applied = applyPassthroughSuffixThinking(sourceFormat, upstreamModel, translatedBody, provider);
+      if (applied) log?.debug?.("PASSTHROUGH", `suffix thinking → ${applied}`);
     }
     // Normalize newer Cowork/CC beta shapes (adaptive thinking, mid-conversation system) the API rejects
     if (clientTool === "claude") normalizeClaudePassthrough(translatedBody, translatedBody.model);

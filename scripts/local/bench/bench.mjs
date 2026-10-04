@@ -278,6 +278,11 @@ async function watch(run) {
   meta.status = status;
   writeJson(metaPath(run), meta);
   log(`${run}: ${status}`);
+  // Keep the last screen of a stuck run (e.g. a permission prompt nobody answered) before the session goes away.
+  if (status !== "DONE") {
+    const screen = shOk("tmux", ["capture-pane", "-p", "-S", "-200", "-t", meta.tmux]).stdout || "";
+    if (screen) { fs.writeFileSync(path.join(RUNS, `${run}.screen.txt`), screen); log(`${run}: last screen → ${RUNS}/${run}.screen.txt`); }
+  }
   shOk("tmux", ["send-keys", "-t", meta.tmux, "/exit", "Enter"]);
   await sleep(4000);
   shOk("tmux", ["kill-session", "-t", meta.tmux]);

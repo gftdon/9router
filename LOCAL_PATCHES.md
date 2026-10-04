@@ -1285,6 +1285,7 @@ request ที่ cache 0 ใช้เวลานานกว่า (13–20 �
 3. เปลี่ยนโมเดลแรกของ fast-worker แล้วรันงานเดิมเทียบด้วย `compare.mjs`
 
 **ผลหลัง deploy LP-036 (13:55–14:28 วันเดียวกัน):** muse cache 96.5% (93 req), latency เฉลี่ย 28 วิ (เดิม 84), ไม่มี muse error/fallback → ผู้ใช้เลือก**ไม่แก้ timeout** รอดูว่ารอดไหม (ผู้ใช้: ไม่ควรเกิน 5 นาทีอยู่แล้ว)
+**ผลจนจบงาน (06:54–10:46 UTC):** fast-worker บน muse 442 call · cache 98.5% · เฉลี่ย 21 วิ/call (เดิม 271) · ยาวสุด 6m12s แต่สำเร็จ · **0 error / 0 fallback / 0 non-stream retry** → ยังไม่ต้องแก้ timeout; ปิด TODO นี้ได้ถ้ารอบหน้ายังไม่เจอ (สรุป: `analysis/findings-2026-10-04-native-vs-9router.md`)
 
 **ถ้ายังล้มอีก — ด่าน timeout ทั้งหมด (ตรวจ 2026-10-04, Claude Code 2.1.289):**
 

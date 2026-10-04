@@ -156,6 +156,22 @@ function claudeBin() {
   return bin;
 }
 
+// The source repo turns some MCP servers off per project (/mcp → ~/.claude.json projects[path].disabledMcpServers;
+// e.g. the Vercel plugin, 244 tools). A run dir is a new project path, so those servers would come back on.
+// Mirror them as deniedMcpServers in the run's local settings instead of writing ~/.claude.json, which
+// running Claude Code sessions rewrite.
+function mirrorDisabledMcp(runDir) {
+  const project = readJson(path.join(os.homedir(), ".claude.json"))?.projects?.[expand(CFG.repo)] || {};
+  const names = [...new Set([...(project.disabledMcpServers || []), ...(CFG.deniedMcpServers || [])])];
+  if (!names.length) return names;
+  const file = path.join(runDir, ".claude", "settings.local.json");
+  const s = readJson(file) || {};
+  const have = new Set((s.deniedMcpServers || []).map((d) => d.serverName));
+  s.deniedMcpServers = [...(s.deniedMcpServers || []), ...names.filter((n) => !have.has(n)).map((serverName) => ({ serverName }))];
+  writeJson(file, s);
+  return names;
+}
+
 async function launch(id) {
   const entry = matrixEntry(id);
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
@@ -166,6 +182,8 @@ async function launch(id) {
   const runDir = path.join(RUNS, run);
   log(`copy template → ${runDir}`);
   cloneDir(TEMPLATE, runDir);
+  const denied = mirrorDisabledMcp(runDir);
+  if (denied.length) log(`MCP servers off like in ${CFG.repo}: ${denied.join(", ")}`);
   const packetFile = path.join(RUNS, `${run}.packet.md`);
   fs.writeFileSync(packetFile, fs.readFileSync(path.join(CFG_DIR, CFG.packet), "utf8").replaceAll("{RUN_ID}", id));
 
@@ -178,8 +196,7 @@ async function launch(id) {
     const s = readJson(SETTINGS_9R);
     if (!s?.env?.ANTHROPIC_BASE_URL) die(`${SETTINGS_9R} has no env.ANTHROPIC_BASE_URL`);
     env.ANTHROPIC_BASE_URL = s.env.ANTHROPIC_BASE_URL;
-    // Same as launching claude9 from a shell that exports the token: with the token in the process
-    // env Claude Code skips the claude.ai connectors (~240 MCP tools, inlined while ENABLE_TOOL_SEARCH=false).
+    // Same as claude9, which exports the token: with it in the process env Claude Code skips the claude.ai connectors.
     if (s.env.ANTHROPIC_AUTH_TOKEN) env.ANTHROPIC_AUTH_TOKEN = s.env.ANTHROPIC_AUTH_TOKEN;
     args.push("--settings", SETTINGS_9R);
   }

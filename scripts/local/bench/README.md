@@ -50,3 +50,7 @@ an untouched tree 15.
 - Runs share provider accounts with everything else on the gateway; run one at a time for clean latency.
 - The combos are the live `9-*` combos — other sessions using them during a run get the bench order.
 - The tmux prompt detection is text-based; if a run does not start, attach and look.
+- A run dir is a new project path, so per-project `/mcp` toggles of the source repo do not apply. The script
+  copies the repo's `disabledMcpServers` from `~/.claude.json` (plus `deniedMcpServers` in bench.json) into the
+  run's `.claude/settings.local.json` as `deniedMcpServers`. Without it the Vercel plugin adds 244 tools to
+  every request (300 vs 61 in a real session).

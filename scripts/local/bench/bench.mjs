@@ -119,11 +119,12 @@ function setCombos(id, { dryRun = false } = {}) {
     const want = entry[role];
     const c = current[comboName];
     if (!c) die(`combo ${comboName} not found in ${ROUTER_DB}`);
-    if (!c.models.includes(want)) die(`${comboName} has no ${want} — add it to the combo first`);
+    // A model the combo does not have yet is added in front for this run; restore-combos (the backup) drops it again.
+    const added = !c.models.includes(want);
     const models = [want, ...c.models.filter((m) => m !== want)];
     result[comboName] = models;
     const changed = JSON.stringify(models) !== JSON.stringify(c.models);
-    log(`${comboName}: ${models[0]}${changed ? "" : " (already first)"}  [${models.slice(1).join(", ")}]`);
+    log(`${comboName}: ${models[0]}${added ? " (added — not in the saved combo)" : changed ? "" : " (already first)"}  [${models.slice(1).join(", ")}]`);
     if (changed && !dryRun) writeCombo(c.id, models);
   }
   return result;

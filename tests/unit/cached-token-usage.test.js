@@ -164,6 +164,40 @@ describe("Anthropic streaming usage (message_start carries cache, message_delta 
     expect(canon.completion_tokens).toBe(50);
   });
 
+  it("trusts message_delta's input/cache split over a cache-less message_start (Kimi)", () => {
+    // Measured on api.kimi.com 2026-10-05: some sessions get a message_start that
+    // reports the whole prompt as input with no cache, and the real split only
+    // in message_delta. Max-merge kept input=5232 AND cache=5120 → prompt 10352.
+    const start = extractUsage({
+      type: "message_start",
+      message: { usage: { input_tokens: 5232, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } },
+    });
+    const delta = extractUsage({
+      type: "message_delta",
+      usage: { input_tokens: 112, cache_creation_input_tokens: 0, cache_read_input_tokens: 5120, output_tokens: 30 },
+    });
+    const merged = mergeUsage(start, delta);
+    expect(merged.prompt_tokens).toBe(112);
+    expect(merged.cache_read_input_tokens).toBe(5120);
+    expect(merged.completion_tokens).toBe(30);
+
+    const canon = canonicalizeUsage(merged);
+    expect(canon.prompt_tokens).toBe(5232);
+    expect(canon.cached_tokens).toBe(5120);
+  });
+
+  it("keeps message_start cache when message_delta repeats input but omits cache fields", () => {
+    const start = extractUsage({
+      type: "message_start",
+      message: { usage: { input_tokens: 100, output_tokens: 1, cache_read_input_tokens: 200 } },
+    });
+    const delta = extractUsage({ type: "message_delta", usage: { input_tokens: 100, output_tokens: 50 } });
+    const merged = mergeUsage(start, delta);
+    expect(merged.prompt_tokens).toBe(100);
+    expect(merged.cache_read_input_tokens).toBe(200);
+    expect(merged.completion_tokens).toBe(50);
+  });
+
   it("does not let a NaN field poison the running max-merge", () => {
     // typeof NaN === "number", so a naive Math.max(prev, NaN) is NaN — one
     // malformed chunk must not wipe out an already-accumulated good value.

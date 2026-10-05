@@ -252,14 +252,18 @@ export function extractUsage(chunk) {
     });
   }
 
-  // Claude format (message_delta event)
+  // Claude format (message_delta event). Its usage is cumulative/final, so when it
+  // carries input_tokens the prompt-side split is authoritative (see mergeUsage).
   if (chunk.type === "message_delta" && chunk.usage && typeof chunk.usage === "object") {
-    return normalizeUsage({
-      prompt_tokens: chunk.usage.input_tokens || 0,
+    const hasInput = typeof chunk.usage.input_tokens === "number";
+    const u = normalizeUsage({
+      prompt_tokens: hasInput ? chunk.usage.input_tokens : undefined,
       completion_tokens: chunk.usage.output_tokens || 0,
       cache_read_input_tokens: chunk.usage.cache_read_input_tokens,
       cache_creation_input_tokens: chunk.usage.cache_creation_input_tokens
     });
+    if (u && hasInput) Object.defineProperty(u, FINAL_PROMPT_SPLIT, { value: true });
+    return u;
   }
 
   // OpenAI Responses API format (response.completed or response.done)
@@ -313,11 +317,20 @@ export function extractUsage(chunk) {
   return null;
 }
 
+// Non-enumerable marker set by extractUsage on a Claude message_delta that
+// carries input_tokens: its input/cache split replaces the running one.
+const FINAL_PROMPT_SPLIT = Symbol("finalPromptSplit");
+const PROMPT_SPLIT_KEYS = ["prompt_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"];
+
 // Field-wise max-merge of two usage objects. Anthropic splits usage across
 // events: message_start has real input+cache (output is a placeholder 1),
 // message_delta has the real cumulative output (input/cache absent). Max keeps
 // the meaningful value from each without clobbering. Idempotent for other
 // providers that emit a single complete usage object.
+// Exception: a message_delta that reports input_tokens overrides the prompt-side
+// fields it carries. Kimi can send message_start as {input: whole prompt, cache: 0}
+// and the real split only in message_delta; max-merging the two keeps the whole
+// prompt as input plus the cache, which canonicalizeUsage then counts twice.
 export function mergeUsage(prev, next) {
   if (!prev) return next || null;
   if (!next) return prev;
@@ -326,7 +339,8 @@ export function mergeUsage(prev, next) {
     // typeof NaN === "number" — guard with Number.isFinite so one malformed
     // chunk can't poison the whole accumulation (Math.max(x, NaN) is NaN).
     if (typeof v === "number" && Number.isFinite(v)) {
-      merged[k] = Math.max(typeof merged[k] === "number" ? merged[k] : 0, v);
+      const override = next[FINAL_PROMPT_SPLIT] && PROMPT_SPLIT_KEYS.includes(k);
+      merged[k] = override ? v : Math.max(typeof merged[k] === "number" ? merged[k] : 0, v);
     } else if (v && typeof v === "object") {
       merged[k] = v; // nested details objects: take latest
     }

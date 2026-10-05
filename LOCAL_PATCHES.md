@@ -8,7 +8,7 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-037 + เอกสาร + `scripts/local/session-analysis` (2026-10-04) |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-038 (`3e480cdb`, 2026-10-05) |
 | Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `c9dedf5e` (LP-017..LP-038) — ติดตั้ง 2026-10-05 15:39 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp038-20261005/`) |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-05 15:39 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |

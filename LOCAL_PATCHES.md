@@ -3,14 +3,14 @@
 > เอกสารนี้บันทึก patch ที่เราแก้เองบน fork (`gftdon/9router`) แต่ยังไม่ได้ขึ้น upstream (`decolua/9router`)
 > **ทุกครั้งที่อัปเดต 9router เวอร์ชันใหม่ ให้เช็คไฟล์นี้ก่อน** — ถ้า patch ถูกเขียนทับ ให้ re-apply ตามขั้นตอนด้านล่างของแต่ละเคส
 
-## สถานะปัจจุบัน (อัปเดต 2026-10-03)
+## สถานะปัจจุบัน (อัปเดต 2026-10-05)
 
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
 | `origin/master` (`gftdon/9router`) | push ครบถึง LP-037 + เอกสาร + `scripts/local/session-analysis` (2026-10-04) |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `1271470a` (LP-017..LP-037) — ติดตั้ง 2026-10-04 21:57 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp037-20261004/`) |
-| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-04 21:57 (bootout + bootstrap) |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `c9dedf5e` (LP-017..LP-038) — ติดตั้ง 2026-10-05 15:39 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp038-20261005/`) |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-05 15:39 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `c9dedf5e` | `open-sse/utils/usageTracking.js` | LP-038: Kimi stream ส่ง `message_start` แบบไม่มี cache (input = prompt ทั้งก้อน) แล้วค่อยแยก cache ใน `message_delta` → max-merge นับ cache ซ้ำ (input ~2 เท่า, cache ดูเหลือ 50%) · ให้ delta ที่มี `input_tokens` ทับค่าฝั่ง prompt | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-05 15:39) |
 | `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE (deploy 2026-10-04 21:57) |
 | `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE |
 | `63a96737` | `open-sse/utils/streamHandler.js` | LP-035: บรรทัด `STALL TIMEOUT … chunks/bytes/sinceLast` พิมพ์เสมอ (เดิมผ่าน `dbg()` ที่ทำงานเฉพาะ dev) | ACTIVE |
@@ -1270,6 +1271,35 @@ request ที่ cache 0 ใช้เวลานานกว่า (13–20 �
 **Deploy:** 2026-10-04 21:57 (bootout → `npm install --global ./9router-0.5.95.tgz` → bootstrap, health ok) · ยืนยันใน log จริงด้วย request แบบ Claude Code (`thinking` budget 31999): `cc/claude-opus-5-5(high)` → `THINK:high`, ส่วน `cc/claude-opus-5-5` (ไม่มี suffix) ยังเป็น `THINK:32k` ตามเดิม · request ทดสอบด้วย curl (ไม่มี system prompt/tools ของ Claude Code) โดน upstream ตอบ 429 `rate_limit_error` "Error" ทั้งแบบมีและไม่มี suffix — เป็นที่รูปแบบ request ทดสอบ (บัญชี OAuth ปฏิเสธ request ที่ไม่ใช่ Claude Code) ไม่ใช่ rate limit และไม่เกี่ยวกับ patch · ยืนยันด้วย Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router --model 9-orchestrator`) 22:01: `9-orchestrator → claude/claude-opus-5-5(high) · passthrough · THINK:high` → DONE 200 บัญชีเดียวกัน
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream ใส่ suffix thinking ใน passthrough เอง (ดู block `if (passthrough)` ใน `chatCore.js`) → UPSTREAM_FIXED · ถ้า upstream เปลี่ยนชื่อ/signature ของ `resolveFormat`/`applyThinking` ต้องปรับ `passthroughThinking.js`
+
+---
+
+## LP-038: Kimi cache ดูเหลือ ~50% ใน Usage › Sessions เพราะ usage ของ stream ถูกนับ cache ซ้ำ
+
+**Status:** ACTIVE · **Commit:** `c9dedf5e` · **Implemented:** 2026-10-05 · พบจากแท็บ Sessions (LP-032)
+
+**อาการ:** session MaeModAI `claude:a7f469f7…`: `kimi-k3(max)` 75 requests ได้ input 21.1M, cached 10.5M (**50% ทุก request**) cost $35.49
+ขณะที่ session `claude:8ceceb1a…` ซึ่งเริ่มพร้อมกัน ใช้ combo และบัญชีเดียวกัน ได้ cached 98%, cost $4.69 · เป็นทั้ง session หรือไม่เป็นเลย (a7f469f7 = 78/78, 8ceceb1a = 1/83)
+พบครั้งแรก 2026-10-03 (session `eafe640b…` 40/40)
+**ไม่ใช่ cache หลุดจริง:** transcript ของ Claude Code ได้ `input_tokens=3116, cache_read=90368` (= 93,484, cache 97%) แต่ DB บันทึก `prompt=183,852` = 3,116 + 90,368 × 2
+cost ใน dashboard เป็นค่าประมาณของ 9router เอง บัญชีนี้เป็น Kimi Code OAuth (subscription) ไม่ได้คิดเงินตาม token
+**Root cause:** Kimi (`api.kimi.com/coding/v1/messages`) บาง session ส่ง `message_start` เป็น `{input: prompt ทั้งก้อน, cache_read: 0}` แล้วค่อยส่งค่าที่แยกแล้วใน `message_delta` `{input: 112, cache_read: 5120}`
+(น่าจะเป็นเพราะ Kimi ผูก session ไว้กับ backend ตัวหนึ่ง ข้อนี้อนุมานจากข้อมูล ยืนยันไม่ได้)
+`mergeUsage` (`stream.js` ใช้ทุก chunk) เอาค่ามากสุดทีละ field จึงได้ input จาก start และ cache จาก delta → `canonicalizeUsage` บวก cache เข้า prompt อีกรอบ
+ฝั่ง client ถูกต้องเพราะ Claude Code ใช้ค่าจาก delta · `claude-to-openai.js` ใช้ค่าจาก delta อยู่แล้ว (ไม่โดน)
+**พิสูจน์ (2026-10-05, ผ่าน gateway จริง):** prompt ~5.2K token ยิง 2 ครั้งต่อ session ด้วย session ID สุ่ม 8 อัน → 2/8 session ได้ start `in=5232 cr=0` / delta `in=112 cr=5120` → DB บันทึก `prompt=10,352` (ซ้ำ) ส่วนอีก 6 session ถูกต้อง
+**แก้:** `extractUsage` ของ `message_delta` ใส่ `prompt_tokens` เฉพาะเมื่อมี `input_tokens` (เดิมใส่ 0) และติด marker แบบ non-enumerable (Symbol)
+→ `mergeUsage` ให้ delta ที่มี marker **ทับ** `prompt_tokens` / `cache_read_input_tokens` / `cache_creation_input_tokens` ที่ delta ส่งมา; field อื่นยัง max-merge เหมือนเดิม
+delta ที่ไม่มี cache field (Anthropic แบบเดิม) ยังเก็บ cache จาก start ไว้ · marker ไม่ติดไปกับ object ที่บันทึก (spread/entries ไม่เห็น)
+**ความปลอดภัย:** แก้เฉพาะการนับ token ไม่แตะ request/header/credential
+
+**Tests:** `tests/unit/cached-token-usage.test.js` +2 (start ไม่มี cache + delta แยก cache → prompt 5232 / cached 5120 — แดงกับโค้ดเดิม (ได้ 5232 เป็น input) · delta ที่ไม่มี cache field ยังเก็บ cache จาก start)
+**Validation (2026-10-05):** full suite เทียบรายข้อกับโค้ดก่อนแก้: ไม่มี fail ใหม่ (100 fail เท่าเดิม, 3,276 → 3,278 tests) · eslint ผ่าน
+**Deploy:** 2026-10-05 15:39 (bootout → สำรอง `/tmp/9router-before-lp038-20261005/` → `npm run cli:pack` → `npm install --global ./9router-0.5.95.tgz` → bootstrap, health ok)
+**ยืนยัน live:** ยิง probe เดิมอีก 8 session ได้ start ไม่มี cache 2 session (`d8a19cfa`, `aa4a900f`) → DB บันทึก `prompt=5232, cached=5120` ถูกต้อง (ก่อนแก้ได้ 10,352)
+**ข้อมูลย้อนหลัง:** ยังไม่ได้แก้ rows เก่า (ตั้งแต่ 2026-10-03) ยังบันทึก prompt/cost เกินจริง · ใช้เกณฑ์คร่าวๆ แล้วเข้าข่ายราว 16,640 kimi rows แต่ปนกับ cache hit บางส่วนที่เป็นของจริง จึงต้องเลือก rows ให้แม่นก่อน backfill
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เปลี่ยน `mergeUsage`/`extractUsage` ให้ delta ทับค่า input/cache เอง → UPSTREAM_FIXED · ถ้า upstream เปลี่ยนเป็น overwrite ทั้งก้อน ต้องเช็คว่า Anthropic delta ที่ไม่มี cache field ยังเก็บ cache จาก start ไว้
 
 ---
 

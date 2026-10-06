@@ -48,6 +48,8 @@ const now = () => new Date().toISOString();
 const log = (...a) => console.log(`[${new Date().toLocaleTimeString("en-GB")}]`, ...a);
 const sh = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...opts });
 const shOk = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: "utf8", ...opts });
+// Agent type the explorer subagent reports in transcripts (~/.claude/agents/explorer.md declares name: Explore).
+const EXPLORER_TYPE = CFG.explorerType || "Explore";
 const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 const readJson = (p, d = null) => { try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return d; } };
 const writeJson = (p, v) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, JSON.stringify(v, null, 2) + "\n"); };
@@ -117,6 +119,7 @@ function setCombos(id, { dryRun = false } = {}) {
   const result = {};
   for (const [role, comboName] of Object.entries(CFG.combos)) {
     const want = entry[role];
+    if (!want) continue; // role not set for this entry (e.g. explorer): leave that combo as it is
     const c = current[comboName];
     if (!c) die(`combo ${comboName} not found in ${ROUTER_DB}`);
     // A model the combo does not have yet is added in front for this run; restore-combos (the backup) drops it again.
@@ -186,7 +189,7 @@ async function launch(id) {
   const denied = mirrorDisabledMcp(runDir);
   if (denied.length) log(`MCP servers off like in ${CFG.repo}: ${denied.join(", ")}`);
   const packetFile = path.join(RUNS, `${run}.packet.md`);
-  fs.writeFileSync(packetFile, fs.readFileSync(path.join(CFG_DIR, CFG.packet), "utf8").replaceAll("{RUN_ID}", id));
+  fs.writeFileSync(packetFile, fs.readFileSync(path.join(CFG_DIR, entry.packet || CFG.packet), "utf8").replaceAll("{RUN_ID}", id));
 
   const sessionId = crypto.randomUUID();
   const sess = tmuxName(run);
@@ -346,7 +349,9 @@ function score(run) {
   const tools = (type) => (summary?.agentsDetail || []).filter((a) => a.agentType === type)
     .reduce((acc, a) => { for (const [k, v] of Object.entries(a.toolStats || {})) acc[k] = (acc[k] || 0) + v.calls; return acc; }, {});
   const byType = summary?.agents?.byType || {};
-  const fwTools = tools("fast-worker"), mainTools = tools("main");
+  const fwTools = tools("fast-worker"), mainTools = tools("main"), exTools = tools(EXPLORER_TYPE);
+  // Entries with an explorer packet hand research to Explorer and leave fast-worker to implementation only.
+  const withExplorer = !!matrixEntry(meta.id).withExplorer;
   const checks = {
     hidden_publish: [15, hidden.publish?.exit === 0],
     hidden_web: [15, hidden.web?.exit === 0],
@@ -356,9 +361,15 @@ function score(run) {
     scope: [15, outside.length === 0 && banned.length === 0 && changed.length > 0],
     bench_result: [5, benchResult],
     committed: [5, head !== base],
-    fast_worker_x2: [5, (byType["fast-worker"] || 0) >= 2],
+    ...(withExplorer ? {
+      fast_worker_impl: [5, (byType["fast-worker"] || 0) >= 1],
+      explorer_x2: [5, (byType[EXPLORER_TYPE] || 0) >= 2],
+      web_research: [5, (exTools.WebFetch || 0) + (exTools.WebSearch || 0) > 0],
+    } : {
+      fast_worker_x2: [5, (byType["fast-worker"] || 0) >= 2],
+      web_research: [5, (fwTools.WebFetch || 0) + (fwTools.WebSearch || 0) > 0],
+    }),
     deep_reasoner_x2: [5, (byType["deep-reasoner"] || 0) >= 2],
-    web_research: [5, (fwTools.WebFetch || 0) + (fwTools.WebSearch || 0) > 0],
     worktree: [5, (mainTools.EnterWorktree || 0) > 0 || wt.path !== meta.runDir],
   };
   const total = Object.values(checks).reduce((a, [w, ok]) => a + (ok ? w : 0), 0);
@@ -388,7 +399,7 @@ function report() {
     "| run | setup (orch / dr / fw) | status | score | wall | API calls | cost | errors / fallbacks | served by 9router |", "|---|---|---|---|---|---|---|---|---|"];
   for (const s of scores) {
     const m = matrixEntry(s.id), e = s.efficiency || {};
-    const setup = m.native ? "native" : [m.orchestrator, m.deepReasoner, m.fastWorker].join(" / ");
+    const setup = (m.native ? "native" : [m.orchestrator, m.deepReasoner, m.fastWorker].join(" / ")) + (m.withExplorer ? ` + explorer${m.explorer ? ` (${m.explorer})` : ""}` : "");
     const served = e.served ? Object.entries(e.served).map(([k, v]) => `${k} ${v}`).join(", ") : "-";
     L.push(`| ${s.run} | ${setup} | ${s.status || "-"} | ${s.score} | ${fmt(e.wallMs)} | ${e.apiCalls ?? "-"} | ${e.routerCost != null ? "$" + e.routerCost : "-"} | ${e.routerErrors ?? "-"} / ${e.fallbacks ?? "-"} | ${served} |`);
   }

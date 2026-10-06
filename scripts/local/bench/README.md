@@ -54,3 +54,6 @@ an untouched tree 15.
   copies the repo's `disabledMcpServers` from `~/.claude.json` (plus `deniedMcpServers` in bench.json) into the
   run's `.claude/settings.local.json` as `deniedMcpServers`. Without it the Vercel plugin adds 244 tools to
   every request (300 vs 61 in a real session).
+- Explorer runs: a matrix entry with `"withExplorer": true` and `"packet": "<file>"` uses that packet, and an
+  `"explorer"` model is moved to the front of the combo mapped by `combos.explorer`. Their process score asks for
+  fast-worker ≥1, Explore ≥2 and web research by Explore instead of fast-worker ≥2 and web research by fast-worker.

@@ -58,3 +58,7 @@ an untouched tree 15.
   `"explorer"` model is moved to the front of the combo mapped by `combos.explorer`. Their process score asks for
   fast-worker ≥1 (5) and Explore ≥2 with web research by Explore (5) instead of fast-worker ≥2 (5) and web
   research by fast-worker (5), so the total stays 100.
+- `"agentPatch": {"<agent file>": {"<frontmatter key>": "<value>"}}` writes a changed copy of
+  `~/.claude/agents/<agent file>.md` into the run's `.claude/agents/` (project agents win over user agents), e.g.
+  `{"explorer": {"model": "haiku"}}` so Explore goes to the combo mapped to haiku on 9router. Your own files stay as
+  they are.

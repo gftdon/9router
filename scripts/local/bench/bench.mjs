@@ -176,6 +176,26 @@ function mirrorDisabledMcp(runDir) {
   return names;
 }
 
+// Per-run agent overrides: copy ~/.claude/agents/<name>.md into the run's .claude/agents/ with some frontmatter
+// fields replaced (project agents win over user agents), e.g. {"explorer": {"model": "haiku"}} so Explore goes to
+// the combo mapped to haiku on 9router. The user's own agent files are not touched.
+function patchAgents(runDir, patch) {
+  const done = [];
+  for (const [name, fields] of Object.entries(patch || {})) {
+    const src = path.join(os.homedir(), ".claude", "agents", `${name}.md`);
+    let text = fs.readFileSync(src, "utf8");
+    for (const [k, v] of Object.entries(fields)) {
+      const re = new RegExp(`^${k}:.*$`, "m");
+      text = re.test(text) ? text.replace(re, `${k}: ${v}`) : text.replace(/^---\n/, `---\n${k}: ${v}\n`);
+    }
+    const dst = path.join(runDir, ".claude", "agents", `${name}.md`);
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.writeFileSync(dst, text);
+    done.push(`${name}.md ${JSON.stringify(fields)}`);
+  }
+  return done;
+}
+
 async function launch(id) {
   const entry = matrixEntry(id);
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
@@ -187,6 +207,7 @@ async function launch(id) {
   log(`copy template → ${runDir}`);
   cloneDir(TEMPLATE, runDir);
   const denied = mirrorDisabledMcp(runDir);
+  for (const f of patchAgents(runDir, entry.agentPatch)) log(`agent override for this run: ${f}`);
   if (denied.length) log(`MCP servers off like in ${CFG.repo}: ${denied.join(", ")}`);
   const packetFile = path.join(RUNS, `${run}.packet.md`);
   fs.writeFileSync(packetFile, fs.readFileSync(path.join(CFG_DIR, entry.packet || CFG.packet), "utf8").replaceAll("{RUN_ID}", id));

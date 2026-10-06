@@ -225,6 +225,7 @@ async function launch(id) {
     if (s.env.ANTHROPIC_AUTH_TOKEN) env.ANTHROPIC_AUTH_TOKEN = s.env.ANTHROPIC_AUTH_TOKEN;
     args.push("--settings", SETTINGS_9R);
   }
+  if (entry.args) args.push(...entry.args); // extra Claude Code flags for this entry, e.g. ["--effort", "max"]
   if (flags.bypass) args.push("--dangerously-skip-permissions");
   // Values (incl. the gateway token) go through a 0700 launch file, never through tmux/ps argv;
   // the file removes itself before exec'ing Claude Code.

@@ -65,3 +65,5 @@ an untouched tree 15.
 - `"args": ["--effort", "max"]` adds Claude Code flags to that entry's launch. `--effort` sets the main thread only;
   sub-agents keep the effort in their agent files. On 9router a combo suffix like `(max)` overrides it anyway (LP-037),
   so use this for native entries.
+- `--max-minutes <n>` (run/batch) raises the time cap for that invocation only; `limits.maxMinutes` in the config
+  stays the default.

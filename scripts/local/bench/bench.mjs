@@ -289,13 +289,14 @@ function doneInTranscript(meta) {
 async function watch(run) {
   const meta = readJson(metaPath(run)) || die(`no run ${run}`);
   const start = Date.parse(meta.startedAt || meta.launchedAt);
-  const maxMs = CFG.limits.maxMinutes * 60e3, idleMs = CFG.limits.idleMinutes * 60e3;
+  const maxMin = Number(flags["max-minutes"]) || CFG.limits.maxMinutes; // --max-minutes raises the cap for this invocation only
+  const maxMs = maxMin * 60e3, idleMs = CFG.limits.idleMinutes * 60e3;
   let status = null, lastPrint = 0;
   while (!status) {
     await sleep(15000);
     const t = Date.now(), act = lastActivity(meta);
     if (doneInTranscript(meta)) { await sleep(20000); status = "DONE"; break; }
-    if (t - start > maxMs) status = `DNF (over ${CFG.limits.maxMinutes} min)`;
+    if (t - start > maxMs) status = `DNF (over ${maxMin} min)`;
     else if (act && t - act > idleMs) status = `DNF (idle ${CFG.limits.idleMinutes} min)`;
     else if (shOk("tmux", ["has-session", "-t", meta.tmux]).status !== 0) status = "DNF (tmux session gone)";
     if (t - lastPrint > 60e3) { lastPrint = t; log(`${run}: ${Math.round((t - start) / 60e3)} min · last activity ${act ? Math.round((t - act) / 1000) + "s ago" : "none"}`); }

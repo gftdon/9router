@@ -363,8 +363,7 @@ function score(run) {
     committed: [5, head !== base],
     ...(withExplorer ? {
       fast_worker_impl: [5, (byType["fast-worker"] || 0) >= 1],
-      explorer_x2: [5, (byType[EXPLORER_TYPE] || 0) >= 2],
-      web_research: [5, (exTools.WebFetch || 0) + (exTools.WebSearch || 0) > 0],
+      explorer_research: [5, (byType[EXPLORER_TYPE] || 0) >= 2 && (exTools.WebFetch || 0) + (exTools.WebSearch || 0) > 0],
     } : {
       fast_worker_x2: [5, (byType["fast-worker"] || 0) >= 2],
       web_research: [5, (fwTools.WebFetch || 0) + (fwTools.WebSearch || 0) > 0],

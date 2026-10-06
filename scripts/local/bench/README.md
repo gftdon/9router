@@ -56,4 +56,5 @@ an untouched tree 15.
   every request (300 vs 61 in a real session).
 - Explorer runs: a matrix entry with `"withExplorer": true` and `"packet": "<file>"` uses that packet, and an
   `"explorer"` model is moved to the front of the combo mapped by `combos.explorer`. Their process score asks for
-  fast-worker ≥1, Explore ≥2 and web research by Explore instead of fast-worker ≥2 and web research by fast-worker.
+  fast-worker ≥1 (5) and Explore ≥2 with web research by Explore (5) instead of fast-worker ≥2 (5) and web
+  research by fast-worker (5), so the total stays 100.

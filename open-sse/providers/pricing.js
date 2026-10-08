@@ -328,6 +328,10 @@ export const PATTERN_PRICING = [
   { pattern: "*-codex",         pricing: { input: 1.75,  output: 14.00, cached: 0.175, reasoning: 14.00,  cache_creation: 1.75  } },
 
   // --- Claude ---
+  // LP-039: Haiku 5.5 is priced by prompt length (platform.claude.com/docs/en/about-claude/pricing,
+  // 2026-10-08). A glob, not a MODEL_PRICING key, so "claude-haiku-5-5(high)" can't fall to claude-haiku-*.
+  { pattern: "claude-haiku-5-5*", pricing: { input: 0.10, output: 0.50, cached: 0.01, reasoning: 0.50, cache_creation: 0.125,
+    longContext: { threshold: 100000, input: 0.50, output: 2.50, cached: 0.05, reasoning: 2.50, cache_creation: 0.625 } } },
   { pattern: "claude-opus-*",   pricing: { input: 5.00,  output: 25.00, cached: 0.50,  reasoning: 25.00,  cache_creation: 6.25  } },
   { pattern: "claude-sonnet-*", pricing: { input: 3.00,  output: 15.00, cached: 0.30,  reasoning: 15.00,  cache_creation: 3.75  } },
   { pattern: "claude-haiku-*",  pricing: { input: 1.00,  output: 5.00,  cached: 0.10,  reasoning: 5.00,   cache_creation: 1.25  } },
@@ -488,6 +492,10 @@ export function calculateCostFromTokens(tokens, pricing) {
   let cost = 0;
 
   const inputTokens = tokens.prompt_tokens || tokens.input_tokens || 0;
+  // Prompt-length tiers (LP-039, Haiku 5.5): once the cache-inclusive prompt
+  // exceeds the threshold, every token in the request bills at the long rates.
+  const lc = pricing.longContext;
+  if (lc && inputTokens > lc.threshold) pricing = { ...pricing, ...lc };
   const cachedTokens = tokens.cached_tokens || tokens.cache_read_input_tokens || 0;
   const cacheCreationTokens = tokens.cache_creation_input_tokens || 0;
   // prompt_tokens is cache-inclusive (see canonicalizeUsage): cached + cache_creation

@@ -8,9 +8,9 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ (2026-10-08) |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-038 (`3e480cdb`, 2026-10-05) · LP-039 (`3848a5e2`) ยังไม่ได้ push |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `3848a5e2` (LP-017..LP-039) — ติดตั้ง 2026-10-08 09:26 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp039-20261008/`) |
-| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-08 09:26 (bootout + bootstrap) |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-039 (2026-10-08) |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `eb2ce4e5` (LP-017..LP-039) — ติดตั้ง 2026-10-08 09:33 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp039b-20261008/`; รอบ 09:26 ที่ `/tmp/9router-before-lp039-20261008/`) |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-08 09:33 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -25,7 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
-| `3848a5e2` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-08 09:26) |
+| `3848a5e2` + `eb2ce4e5` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js`, `open-sse/providers/pricing.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget · ราคา Haiku 5.5 แบบ 2 ขั้นตามความยาว prompt ($0.10/$0.50 ≤100k, $0.50/$2.50 >100k; เดิมตก glob Haiku 4.5 แพง 10 เท่า) | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-08 09:33) |
 | `c9dedf5e` | `open-sse/utils/usageTracking.js` | LP-038: Kimi stream ส่ง `message_start` แบบไม่มี cache (input = prompt ทั้งก้อน) แล้วค่อยแยก cache ใน `message_delta` → max-merge นับ cache ซ้ำ (input ~2 เท่า, cache ดูเหลือ 50%) · ให้ delta ที่มี `input_tokens` ทับค่าฝั่ง prompt | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-05 15:39) |
 | `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE (deploy 2026-10-04 21:57) |
 | `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE |
@@ -1304,9 +1304,11 @@ delta ที่ไม่มี cache field (Anthropic แบบเดิม) ย
 
 ---
 
-## LP-039: Haiku 5.5 ได้ `budget_tokens` แทน effort — combo `cc/claude-haiku-5-5(high)` ขึ้น `THINK:25k`
+## LP-039: Haiku 5.5 ได้ `budget_tokens` แทน effort — combo `cc/claude-haiku-5-5(high)` ขึ้น `THINK:25k` (+ ราคา Haiku 5.5)
 
-**Status:** ACTIVE · **Commit:** `3848a5e2` · **Implemented:** 2026-10-08 · พบตอนทดสอบ combo `9-haiku-level`
+**Status:** ACTIVE · **Commit:** `3848a5e2` (thinking/effort) + `eb2ce4e5` (ราคา) · **Implemented:** 2026-10-08 · พบตอนทดสอบ combo `9-haiku-level`
+
+### ส่วนที่ 1 — thinking/effort (`3848a5e2`)
 
 **อาการ:** combo `9-haiku-level` = `cc/claude-haiku-5-5(high)` แต่ log ขึ้น `THINK:25k` ขณะที่ `9-fast-worker` (`cc/claude-sonnet-5-5(high)`) ขึ้น `THINK:high`
 ไม่ว่า client จะส่งอะไรมาก็ได้ผลเดียวกัน: curl ที่ส่ง `thinking: adaptive` + `output_config.effort: high` มาเองก็ยังออกเป็น budget 24576 (ค่า `THINK:` ใน log อ่านจาก body ที่แปลงแล้ว = ค่าที่ส่งขึ้นไปจริง)
@@ -1328,7 +1330,32 @@ delta ที่ไม่มี cache field (Anthropic แบบเดิม) ย
 **ยืนยัน live:** curl `9-haiku-level` → `claude/claude-haiku-5-5(high) · FMT: claude→claude · THINK:high` (ก่อนแก้ `THINK:25k`) · `cc/claude-haiku-4-5-20251001(high)` → `THINK:25k` ตามเดิม
 Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router --model 9-haiku-level`) → `FMT: claude (passthrough) · 50 TOOL · THINK:high` ตอบ `i'm haiku`
 
-**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เพิ่มแถว Haiku 5 เป็น `claude-adaptive` ใน `PATTERN_CAPABILITIES` **และ** แคบ `ADAPTIVE_THINKING_UNSUPPORTED` ให้ไม่จับ Haiku 5 → UPSTREAM_FIXED (ต้องครบทั้งสองจุด ถ้าแก้จุดเดียว → CASE C เก็บจุดที่เหลือ) · ถ้ามี Haiku รุ่นใหม่กว่า 5 ต้องเช็คว่า regex/pattern ยังครอบคลุม
+### ส่วนที่ 2 — ราคา Haiku 5.5 (`eb2ce4e5`)
+
+**อาการ:** `claude-haiku-5-5` ไม่มีราคาของตัวเอง → ตก glob `claude-haiku-*` (เรท Haiku 4.5 $1/$5) = **แพงเกินจริง 10 เท่า** ใน Usage/Sessions
+ชื่อที่ `usageHistory` บันทึกมี suffix (`claude-haiku-5-5(high)`) ซึ่ง glob `claude-haiku-*` จับก่อนถึงขั้นตัด suffix (ขั้น 5 ของ `getPricingForModel`) → ใส่แค่ key ใน `MODEL_PRICING` ไม่พอ ต้องเป็น glob
+**ราคา (platform.claude.com/docs/en/about-claude/pricing, ตรวจ 2026-10-08)** — Haiku 5.5 คิดตามความยาว prompt (ตัวเดียวในรุ่น 4.6+ ที่ไม่ได้ราคาเดียวทั้ง 1M):
+
+| prompt | input | output | cache hit | 5m cache write | 1h cache write |
+|---|---|---|---|---|---|
+| ≤ 100k token | $0.10 | $0.50 | $0.01 | $0.125 | $0.20 |
+| > 100k token | $0.50 | $2.50 | $0.05 | $0.625 | $1.00 |
+
+(batch ครึ่งราคา: $0.05/$0.25 และ $0.25/$1.25 — 9router ไม่ได้ใช้ batch)
+**แก้:** `open-sse/providers/pricing.js`
+- glob `claude-haiku-5-5*` ไว้**ก่อน** `claude-haiku-*` (ครอบทั้ง `claude-haiku-5-5` และแบบมี suffix) พร้อม field ใหม่ `longContext: { threshold: 100000, input, output, cached, reasoning, cache_creation }`
+- `calculateCostFromTokens`: ถ้ามี `longContext` และ prompt (แบบรวม cache, `prompt_tokens`) **เกิน** threshold → คิดทั้ง request ด้วยเรทชุดยาว · entry ที่ไม่มี `longContext` ไม่เปลี่ยน
+- `cache_creation` ใช้เรท 5m write ($0.125) ตามแบบเดิมของทุกรุ่น Claude ในตาราง (ตารางเก็บเรท cache write ได้ค่าเดียว แม้ `prepareClaudeRequest` จะตั้ง ttl 1h ให้ system — จุดนี้ต่ำกว่าจริงเหมือนรุ่นอื่น)
+- ผู้ใช้ `getPricingForModel`/`calculateCostFromTokens` มีแค่ `usageRepo.calculateCost` กับ `scripts/backfill-usage-cost.mjs` · `/api/pricing` ส่งแค่ `PROVIDER_PRICING` (ไม่เห็น glob/`longContext`) · DB ไม่มีราคาที่ผู้ใช้ override (`kv` scope `pricing` = 0 แถว)
+**Tests:** `tests/unit/claude-haiku-5-5-pricing.test.js` (ใหม่, 6 ข้อ — 5 ข้อแดงกับโค้ดเดิม): เรทของ `claude-haiku-5-5` / `(high)` / `(max)` · Haiku 4.5 ยังได้ $1/$5 · prompt 100k พอดี = เรทสั้น · prompt 120k (มี cache hit + cache write) = เรทยาวทั้ง request
+**Validation (2026-10-08):** full suite เทียบรายข้อกับโค้ดก่อนแก้: ไม่มี fail ใหม่ (100 fail เท่าเดิม, 3,283 → 3,289 tests) · eslint ผ่าน
+**Deploy:** 2026-10-08 09:33 (สำรอง `/tmp/9router-before-lp039b-20261008/` → `npm run cli:pack` → ตรวจ tarball มี glob `claude-haiku-5-5*` + `longContext` → bootout → `npm install --global` → bootstrap, health ok)
+**ยืนยัน live:** `9-haiku-level` 09:33 → `usageHistory` บันทึก `claude-haiku-5-5(high)` prompt 22 / output 8 = **$0.0000062** (เรทใหม่) · แถวเดียวกันตอน 09:26 ก่อนแก้ = $0.000062 (เรท Haiku 4.5)
+**ข้อมูลย้อนหลัง:** ไม่ได้ backfill — มีแถว Haiku 5.5 ก่อนแก้แค่ 4 แถว (วันที่ 2026-10-08 ทั้งหมด) ถ้าต้องการให้ใช้ `scripts/backfill-usage-cost.mjs`
+**ข้อสังเกต (ยังไม่แก้ นอก scope):** ปัญหาเดียวกันเกิดกับ Opus/Sonnet 5.5 ที่มี suffix — `claude-sonnet-5-5(high)` ตก glob `claude-sonnet-*` ($3/$15 แทน $2/$10) และ `claude-opus-5-5` ไม่มี key เลย ตก `claude-opus-*` ($5/$25 แทน $4/$20)
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** (ราคา) ถ้า upstream ใส่ราคา Haiku 5.5 เอง ให้เช็คว่าจับชื่อที่มี suffix ได้และมีเรท > 100k ด้วย ถ้าไม่มีเรทแบบขั้น → CASE C เก็บ `longContext` ไว้ · ถ้า upstream เปลี่ยน signature ของ `calculateCostFromTokens` ต้องย้ายการสลับเรทตาม
+(thinking/effort) ถ้า upstream เพิ่มแถว Haiku 5 เป็น `claude-adaptive` ใน `PATTERN_CAPABILITIES` **และ** แคบ `ADAPTIVE_THINKING_UNSUPPORTED` ให้ไม่จับ Haiku 5 → UPSTREAM_FIXED (ต้องครบทั้งสองจุด ถ้าแก้จุดเดียว → CASE C เก็บจุดที่เหลือ) · ถ้ามี Haiku รุ่นใหม่กว่า 5 ต้องเช็คว่า regex/pattern ยังครอบคลุม
 
 ---
 

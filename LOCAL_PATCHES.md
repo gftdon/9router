@@ -3,14 +3,14 @@
 > เอกสารนี้บันทึก patch ที่เราแก้เองบน fork (`gftdon/9router`) แต่ยังไม่ได้ขึ้น upstream (`decolua/9router`)
 > **ทุกครั้งที่อัปเดต 9router เวอร์ชันใหม่ ให้เช็คไฟล์นี้ก่อน** — ถ้า patch ถูกเขียนทับ ให้ re-apply ตามขั้นตอนด้านล่างของแต่ละเคส
 
-## สถานะปัจจุบัน (อัปเดต 2026-10-05)
+## สถานะปัจจุบัน (อัปเดต 2026-10-08)
 
 | รายการ | ค่า |
 |---|---|
-| Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-038 (`3e480cdb`, 2026-10-05) |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `c9dedf5e` (LP-017..LP-038) — ติดตั้ง 2026-10-05 15:39 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp038-20261005/`) |
-| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-05 15:39 (bootout + bootstrap) |
+| Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ (2026-10-08) |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-038 (`3e480cdb`, 2026-10-05) · LP-039 (`3848a5e2`) ยังไม่ได้ push |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `3848a5e2` (LP-017..LP-039) — ติดตั้ง 2026-10-08 09:26 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp039-20261008/`) |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-08 09:26 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `3848a5e2` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-08 09:26) |
 | `c9dedf5e` | `open-sse/utils/usageTracking.js` | LP-038: Kimi stream ส่ง `message_start` แบบไม่มี cache (input = prompt ทั้งก้อน) แล้วค่อยแยก cache ใน `message_delta` → max-merge นับ cache ซ้ำ (input ~2 เท่า, cache ดูเหลือ 50%) · ให้ delta ที่มี `input_tokens` ทับค่าฝั่ง prompt | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-05 15:39) |
 | `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE (deploy 2026-10-04 21:57) |
 | `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE |
@@ -1300,6 +1301,34 @@ delta ที่ไม่มี cache field (Anthropic แบบเดิม) ย
 **ข้อมูลย้อนหลัง:** ยังไม่ได้แก้ rows เก่า (ตั้งแต่ 2026-10-03) ยังบันทึก prompt/cost เกินจริง · ใช้เกณฑ์คร่าวๆ แล้วเข้าข่ายราว 16,640 kimi rows แต่ปนกับ cache hit บางส่วนที่เป็นของจริง จึงต้องเลือก rows ให้แม่นก่อน backfill
 
 **⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เปลี่ยน `mergeUsage`/`extractUsage` ให้ delta ทับค่า input/cache เอง → UPSTREAM_FIXED · ถ้า upstream เปลี่ยนเป็น overwrite ทั้งก้อน ต้องเช็คว่า Anthropic delta ที่ไม่มี cache field ยังเก็บ cache จาก start ไว้
+
+---
+
+## LP-039: Haiku 5.5 ได้ `budget_tokens` แทน effort — combo `cc/claude-haiku-5-5(high)` ขึ้น `THINK:25k`
+
+**Status:** ACTIVE · **Commit:** `3848a5e2` · **Implemented:** 2026-10-08 · พบตอนทดสอบ combo `9-haiku-level`
+
+**อาการ:** combo `9-haiku-level` = `cc/claude-haiku-5-5(high)` แต่ log ขึ้น `THINK:25k` ขณะที่ `9-fast-worker` (`cc/claude-sonnet-5-5(high)`) ขึ้น `THINK:high`
+ไม่ว่า client จะส่งอะไรมาก็ได้ผลเดียวกัน: curl ที่ส่ง `thinking: adaptive` + `output_config.effort: high` มาเองก็ยังออกเป็น budget 24576 (ค่า `THINK:` ใน log อ่านจาก body ที่แปลงแล้ว = ค่าที่ส่งขึ้นไปจริง)
+**Root cause:** กฎของ Haiku เขียนไว้ตอนยังมีแค่ Haiku 4.5 (รับได้แค่ `budget_tokens`; effort error) — มีอยู่ 2 จุด:
+- `open-sse/providers/capabilities.js` — `*claude*haiku*` → `thinkingFormat: "claude-budget"` ทุกรุ่น → `(high)` กลายเป็น `budget_tokens: 24576` (`LEVEL_TO_BUDGET.high`) ทั้ง path ที่แปลง format และ passthrough (LP-037 ใช้ตารางเดียวกัน)
+- `open-sse/translator/formats/claude.js` — `ADAPTIVE_THINKING_UNSUPPORTED = /haiku/i` → `normalizeClaudePassthrough` เปลี่ยน adaptive เป็น `budget_tokens: 10000` และลบ `output_config.effort` ทิ้ง
+**พิสูจน์ว่า Haiku 5.5 รองรับ (2026-10-08, ยิงตรง `api.anthropic.com` ด้วย OAuth ของ Account 2 ไม่ผ่าน gateway):**
+`adaptive` + effort `low`/`high`/`xhigh`/`max` ผ่านทั้งหมด (`max` คิด 257 token, ระดับอื่น ~55 กับโจทย์ง่าย) · effort อย่างเดียวไม่ใส่ `thinking` ก็ผ่านและคิด · ไม่ใส่อะไรเลยก็คิด (thinking เปิดเป็นค่าเริ่มต้น)
+`budget_tokens` ยังรับ · `thinking: disabled` รับ (ไม่เหมือน Sonnet/Opus 5.5 ที่ตอบ 400) · effort `bogus` → 400 `Input should be 'low', 'medium', 'high', 'xhigh' or 'max'` = API ตรวจค่า effort จริง ไม่ได้เมิน
+**แก้:**
+- `capabilities.js` เพิ่มแถว `*claude*haiku-5*` → `claude-adaptive` ไว้**ก่อน**แถว `*claude*haiku*` เดิม (pattern match ตามลำดับ) · ระดับ effort ได้ `budgetX` (มี `xhigh`/`max`) จาก `thinkingLevels.js` เอง ไม่ต้องแก้
+- `claude.js` regex → `/haiku(?![-.]?5)/i` จับเฉพาะ Haiku ก่อน 5 (`claude-haiku-4-5`, `claude-haiku-4.5`, `claude-3-haiku-…`, `claude-4.5-haiku` ยังโดน; `claude-haiku-5-5`/`claude-haiku-5.5` ไม่โดน)
+- Haiku 4.5 ยังเป็น budget ตามเดิม
+**ความปลอดภัย:** แก้แค่ตาราง capability กับ regex ของ thinking ไม่แตะ request/header/credential · token OAuth ที่ใช้ probe อ่านจาก DB เข้าตัวแปร shell อย่างเดียว ไม่ได้พิมพ์หรือเขียนลงไฟล์
+
+**Tests:** +5 — `tests/translator/thinking-unified.test.js` +2 (Haiku 5.5 → adaptive + effort high · `(xhigh)` ไม่ถูก clamp เป็น high) · `tests/unit/translator-helpers-edge.test.js` +2 (passthrough คง adaptive + effort ของ Haiku 5.5 · Haiku 4.5 ยังลบ effort) · `tests/unit/passthrough-suffix-thinking.test.js` +1 (`claude-haiku-5-5(high)` → `claude-adaptive`) — ข้อ Haiku 5.5 ทั้ง 4 แดงกับโค้ดเดิม
+**Validation (2026-10-08):** full suite เทียบรายข้อกับโค้ดก่อนแก้: ไม่มี fail ใหม่ (100 fail เท่าเดิม, 3,278 → 3,283 tests) · eslint ผ่าน
+**Deploy:** 2026-10-08 09:26 (สำรอง global + SQLite ที่ `/tmp/9router-before-lp039-20261008/` → `npm run cli:pack` → ตรวจ tarball ว่ามีแถว `haiku-5` + regex ใหม่ → bootout → `npm install --global ./9router-0.5.95.tgz` → bootstrap, health ok)
+**ยืนยัน live:** curl `9-haiku-level` → `claude/claude-haiku-5-5(high) · FMT: claude→claude · THINK:high` (ก่อนแก้ `THINK:25k`) · `cc/claude-haiku-4-5-20251001(high)` → `THINK:25k` ตามเดิม
+Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router --model 9-haiku-level`) → `FMT: claude (passthrough) · 50 TOOL · THINK:high` ตอบ `i'm haiku`
+
+**⚠️ เช็คตอน upgrade รอบหน้า:** ถ้า upstream เพิ่มแถว Haiku 5 เป็น `claude-adaptive` ใน `PATTERN_CAPABILITIES` **และ** แคบ `ADAPTIVE_THINKING_UNSUPPORTED` ให้ไม่จับ Haiku 5 → UPSTREAM_FIXED (ต้องครบทั้งสองจุด ถ้าแก้จุดเดียว → CASE C เก็บจุดที่เหลือ) · ถ้ามี Haiku รุ่นใหม่กว่า 5 ต้องเช็คว่า regex/pattern ยังครอบคลุม
 
 ---
 

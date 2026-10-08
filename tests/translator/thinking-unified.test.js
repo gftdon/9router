@@ -101,6 +101,16 @@ describe("applyThinking per provider format", () => {
     const out = apply("claude", "claude-haiku-4.5", { reasoning_effort: "high" }, "claude");
     expect(out.thinking).toEqual({ type: "enabled", budget_tokens: 24576 });
   });
+  // LP-039: Haiku 5.5 takes adaptive thinking + effort low..max (probed live 2026-10-08).
+  it("claude haiku 5.5 → adaptive thinking + output_config", () => {
+    const out = apply("claude", "claude-haiku-5-5", { reasoning_effort: "high" }, "claude");
+    expect(out.thinking).toEqual({ type: "adaptive" });
+    expect(out.output_config).toEqual({ effort: "high" });
+  });
+  it("claude haiku 5.5 keeps xhigh (not clamped to high)", () => {
+    const out = apply("claude", "claude-haiku-5-5(xhigh)", {}, "claude");
+    expect(out.output_config).toEqual({ effort: "xhigh" });
+  });
   it("gemini-3 → thinkingLevel", () => {
     const out = apply("gemini", "gemini-3-pro", { reasoning_effort: "medium" }, "gemini");
     expect(out.generationConfig.thinkingConfig.thinkingLevel).toBe("medium");

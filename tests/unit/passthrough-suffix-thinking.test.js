@@ -69,6 +69,13 @@ describe("applyPassthroughSuffixThinking — Claude wire", () => {
     expect(body.thinking.budget_tokens).toBeLessThan(body.max_tokens);
   });
 
+  it("turns haiku 5.5 (high) into adaptive + effort, not a budget (LP-039)", () => {
+    const body = claudeBody({ model: "claude-haiku-5-5" });
+    expect(applyPassthroughSuffixThinking("claude", "claude-haiku-5-5(high)", body, "claude")).toBe("claude-adaptive");
+    expect(body.thinking).toEqual({ type: "adaptive" });
+    expect(body.output_config).toEqual({ effort: "high" });
+  });
+
   it("leaves the body untouched without a suffix", () => {
     const body = claudeBody({ output_config: { effort: "low" } });
     const before = structuredClone(body);

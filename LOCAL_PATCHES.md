@@ -8,7 +8,7 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.99` (`ce4460ef`, upstream ไม่มี tag) — merge `3353e5fe` (2026-10-15); รอบก่อน `v0.5.95` (`a99cf572`) merge `c3deacad` |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-039 (2026-10-08) — **merge v0.5.99 + LP-040 ยังไม่ได้ push** (รอผู้ใช้สั่ง) |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-040 + merge v0.5.99 (2026-10-15, `838e9c13..c5349fd8` push ปกติ ไม่ force) |
 | Build ที่ติดตั้ง global | `9router-0.5.99.tgz` จาก commit `9b61ee41` (v0.5.99 + LP-040; 15,663,725 bytes, SHA-256 `475fa91d154dc496c20035f5e6fd867939941f0ea17dac9574e66ee81a1553c3`) — ติดตั้ง 2026-10-15 09:11 · สำรองตัวเดิม (0.5.95) + SQLite (`.backup` แบบ online, integrity ok) + plist ที่ `/tmp/9router-before-v0599-20261015/` (0700/0600) |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-10-15 09:11:49 (launcher PID 56074, listener 56101); `server.log` กลับมาเขียนแล้ว (LP-034) · ก่อนหน้านี้ (10–15 ต.ค.) ตัวที่รันเป็น `9router` ที่เปิดเองจาก zsh ไม่มี `--log` — ปิด launcher ก่อนแล้วค่อยปิด server ตอนติดตั้ง |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |

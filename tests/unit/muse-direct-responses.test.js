@@ -155,8 +155,8 @@ describe("muse direct provider effort levels", () => {
 
 describe("muse direct provider non-stream clients", () => {
   // The Responses translator always sends stream:true, so Meta answers SSE even
-  // for stream:false; without forceStream the chat SSE parser returned an empty
-  // chat.completion. (LP-020)
+  // for stream:false. LP-020 declared forceStream for this; upstream b00ba1aa now
+  // folds Responses SSE for non-stream clients itself, so muse no longer needs it.
   const responsesSSE = [
     `event: response.created\ndata: ${JSON.stringify({ type: "response.created", response: { id: "resp_m1", created_at: 1700000000 } })}`,
     `event: response.output_item.done\ndata: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item: { type: "message", role: "assistant", content: [{ type: "output_text", text: "hi" }] } })}`,

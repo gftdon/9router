@@ -8,7 +8,7 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.99` (`ce4460ef`, upstream ไม่มี tag) — merge `3353e5fe` (2026-10-15); รอบก่อน `v0.5.95` (`a99cf572`) merge `c3deacad` |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-040 + merge v0.5.99 (2026-10-15, `838e9c13..34ad7467` push ปกติ ไม่ force) · **ยังไม่ push:** `06c1bbdb` `aab870b0` (ถอด LP-020) และ `6c969135` + docs (LP-041) |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-041 + ถอด LP-020 (2026-10-15, `34ad7467..b12aa41e` push ปกติ ไม่ force); รอบก่อน LP-040 + merge v0.5.99 (`838e9c13..34ad7467`) |
 | Build ที่ติดตั้ง global | `9router-0.5.99.tgz` จาก commit `9bbaf320` (โค้ด = `6c969135`: v0.5.99 + LP-040 + ถอด LP-020 + LP-041; 15,663,927 bytes, SHA-256 `ea66f187fa56c4aae18a335a4c115c5579808c4b478c10b9ce902287bb531d17`) — ติดตั้ง 2026-10-15 10:30 · สำรอง build เดิม (`9b61ee41`) + SQLite (`.backup` แบบ online, integrity ok, 250,393 แถว `usageHistory`) + plist ที่ `/tmp/9router-before-lp041-20261015/` (0700/0600) · รอบก่อน (09:11, 0.5.95 → `9b61ee41`) สำรองที่ `/tmp/9router-before-v0599-20261015/` |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-10-15 10:30:37 (launcher PID 29035, listener 29053; KeepAlive=false จึงหยุด launcher → server แล้วติดตั้งได้โดยไม่เกิดใหม่เอง); `server.log` กลับมาเขียนแล้ว (LP-034) · ก่อนหน้านี้ (10–15 ต.ค.) ตัวที่รันเป็น `9router` ที่เปิดเองจาก zsh ไม่มี `--log` — ปิด launcher ก่อนแล้วค่อยปิด server ตอนติดตั้ง |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |

@@ -3,31 +3,31 @@
 > เอกสารนี้บันทึก patch ที่เราแก้เองบน fork (`gftdon/9router`) แต่ยังไม่ได้ขึ้น upstream (`decolua/9router`)
 > **ทุกครั้งที่อัปเดต 9router เวอร์ชันใหม่ ให้เช็คไฟล์นี้ก่อน** — ถ้า patch ถูกเขียนทับ ให้ re-apply ตามขั้นตอนด้านล่างของแต่ละเคส
 
-## สถานะปัจจุบัน (อัปเดต 2026-10-08)
+## สถานะปัจจุบัน (อัปเดต 2026-10-15)
 
 | รายการ | ค่า |
 |---|---|
-| Upstream base | `v0.5.95` (`a99cf572`) — merge `c3deacad`; `upstream/master` ยังเท่ากับ v0.5.95 ตอนตรวจ (2026-10-08) |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-039 (2026-10-08) |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `eb2ce4e5` (LP-017..LP-039) — ติดตั้ง 2026-10-08 09:33 (สำรองตัวเดิม + SQLite ที่ `/tmp/9router-before-lp039b-20261008/`; รอบ 09:26 ที่ `/tmp/9router-before-lp039-20261008/`) |
+| Upstream base | `v0.5.99` (`ce4460ef`, upstream ไม่มี tag) — merge `3353e5fe` (2026-10-15); รอบก่อน `v0.5.95` (`a99cf572`) merge `c3deacad` |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-039 (2026-10-08) — **merge v0.5.99 ยังไม่ได้ push** |
+| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `eb2ce4e5` (LP-017..LP-039) — ติดตั้ง 2026-10-08 09:33 (v0.5.99 ยังไม่ได้ติดตั้ง) |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`, log `~/.9router/logs/server.log` ตาม LP-034) — start 2026-10-08 09:33 (bootout + bootstrap) |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
-| ค้างตรวจ | — (เรื่อง error กลาง stream ของ Responses upstream แก้แล้วใน LP-031) |
+| ค้างตรวจ | LP-020 `NEEDS_REVIEW` (v0.5.99) — probe non-stream บน `muse/…` แบบไม่มี `forceStream` ก่อนถอด · Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.99) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
 
 | Commit | ไฟล์ที่แก้ | แก้อะไร | สถานะ |
 |---|---|---|---|
-| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / MODIFIED (v0.5.95 — ผ่าน `refine()` ของ upstream) |
-| `0bb6cc65` | `src/sse/services/model.js` | Patch 2: strip `[1m]` suffix ตอน resolve combo name | ACTIVE / REDUNDANT-สำหรับ chat path (v0.5.95) |
+| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / KEPT (v0.5.99 — upstream แก้ pattern GLM เป็น 1M แล้ว แต่ยังไม่ strip suffix: 34/53 model ต่าง) |
+| `0bb6cc65` | `src/sse/services/model.js` | Patch 2: strip `[1m]` suffix ตอน resolve combo name | ACTIVE / REDUNDANT-สำหรับ chat path (v0.5.99) |
 | `c31f4070` | `open-sse/translator/formats/gemini.js` | LP-006: strip schema annotations โดยรักษาชื่อ property จริง (เพิ่มทะเบียนย้อนหลัง) | ACTIVE / KEPT (v0.5.95) |
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
 | `3848a5e2` + `eb2ce4e5` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js`, `open-sse/providers/pricing.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget · ราคา Haiku 5.5 แบบ 2 ขั้นตามความยาว prompt ($0.10/$0.50 ≤100k, $0.50/$2.50 >100k; เดิมตก glob Haiku 4.5 แพง 10 เท่า) | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-08 09:33) |
 | `c9dedf5e` | `open-sse/utils/usageTracking.js` | LP-038: Kimi stream ส่ง `message_start` แบบไม่มี cache (input = prompt ทั้งก้อน) แล้วค่อยแยก cache ใน `message_delta` → max-merge นับ cache ซ้ำ (input ~2 เท่า, cache ดูเหลือ 50%) · ให้ delta ที่มี `input_tokens` ทับค่าฝั่ง prompt | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-05 15:39) |
-| `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE (deploy 2026-10-04 21:57) |
+| `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE / KEPT (v0.5.99 — Opus 5.5 เป็น always-thinking ตาม upstream `a07ed95b`: ส่ง effort อย่างเดียว; ปรับเทส) |
 | `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE |
 | `63a96737` | `open-sse/utils/streamHandler.js` | LP-035: บรรทัด `STALL TIMEOUT … chunks/bytes/sinceLast` พิมพ์เสมอ (เดิมผ่าน `dbg()` ที่ทำงานเฉพาะ dev) | ACTIVE |
 | — (นอก repo) | `~/Library/LaunchAgents/com.9router.autostart.plist`, `~/Library/LaunchAgents/com.9router.logrotate.plist`, `~/.9router/bin/rotate-logs.sh` | LP-034: เปิด `--log` ให้ server เขียน console log ลง `~/.9router/logs/server.log` + หมุน log รายชั่วโมง (เดิม output ของ server ถูกทิ้ง) | ACTIVE (apply + ยืนยัน live แล้ว) |
@@ -35,8 +35,8 @@
 | `79698992` | `open-sse/handlers/chatCore.js` (+3 handlers, `requestDetail.js`), `open-sse/utils/sessionManager.js`, `src/lib/db/{schema.js,repos/usageRepo.js}`, `usage/page.js` + ไฟล์ใหม่ `src/lib/usage/sessionUsage.js`, `/api/usage/sessions`, `SessionsTab.js` | LP-032: บันทึก Session ID ของ client ลง `usageHistory` + แท็บ Usage › Sessions (ยอดรวมต่อ session, Detail แยกต่อ model) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `baedc557` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js` | LP-031: Responses upstream ส่ง `event: error` / `response.failed` หลัง HTTP 200 → client non-stream ได้ error (429 สำหรับ rate limit, 502 อื่นๆ) แทน 200 ว่าง เพื่อให้ account/combo fallback | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `df7999a5` | `open-sse/executors/muse.js` | LP-028: ย้าย effort เข้า `reasoning` เมื่อ Responses body มี `input` เป็น string (แก้ LP-018) | ACTIVE (deploy + ยืนยัน live แล้ว) |
-| `6a389c60` | `open-sse/handlers/chatCore.js` | LP-029: provider ที่ forceStream แต่ตอบ JSON ธรรมดา → ใช้ handler non-stream แทนการห่อ JSON เป็น SSE | ACTIVE (deploy + ยืนยัน live แล้ว) |
-| `cb1a19d1` | `open-sse/handlers/chatCore.js` | LP-030: upstream รูปแบบ Responses ที่ส่ง SSE ให้ client non-stream → แปลงด้วย SSE→JSON handler (เดิมได้ chat.completion ว่าง) | ACTIVE (deploy + ยืนยัน live แล้ว) |
+| `6a389c60` | `open-sse/handlers/chatCore.js` | LP-029: provider ที่ forceStream แต่ตอบ JSON ธรรมดา → ใช้ handler non-stream แทนการห่อ JSON เป็น SSE | ACTIVE / KEPT (v0.5.99 — ยังจำเป็นกับ provider forceStream ที่ตอบ JSON) |
+| `cb1a19d1` | `open-sse/handlers/chatCore.js` | LP-030: upstream รูปแบบ Responses ที่ส่ง SSE ให้ client non-stream → แปลงด้วย SSE→JSON handler (เดิมได้ chat.completion ว่าง) | ACTIVE / MODIFIED (v0.5.99 — upstream `b00ba1aa` ครอบเส้นหลักแล้ว เหลือ source ตระกูล Gemini) |
 | `d58788ff` | `open-sse/providers/thinkingLevels.js` | LP-027: ระดับ effort ของ muse-spark บน `opencode-go` = minimal…max (เดิม `ocg/…(max)` ถูกตัดเหลือ xhigh) | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `09c1e5a9` | `open-sse/translator/formats/gemini.js`, `concerns/schemaPlaceholder.js`, `response/gemini-to-openai.js`, `chatCore/nonStreamingHandler.js`, `utils/stream.js`, `executors/antigravity.js` | LP-026 (เดิม Bug A): placeholder `reason` ของ schema ว่างเป็น optional + ตัดออกจาก tool call ที่ส่งกลับ client | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `1df544ca` | `open-sse/providers/pricing.js` | LP-007: เรตตระกูล gpt-6 ตามราคาทางการ OpenAI | UPSTREAM_FIXED (`92c7bdd5`, v0.5.95) |
@@ -50,18 +50,94 @@
 | `c85dc41e` | `open-sse/config/grokCli.js` (+7 ไฟล์) | LP-015: backport upstream `6b9dc54d` — Grok CLI identity 0.2.99 → 1.0.44 (แก้ HTTP 426) | UPSTREAM_FIXED (`6b9dc54d` อยู่ใน v0.5.95 แล้ว) |
 | `8f7c6cde` | `open-sse/handlers/chatCore/{sseToJsonHandler,nonStreamingHandler,claudeMessageBody}.js` | LP-016 (เดิม Bug C): `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน Anthropic `message` แทน chat.completion | ACTIVE / KEPT (v0.5.95) |
 
-| `010d2460` | `open-sse/handlers/chatCore.js` | LP-017: เลือก transport ตาม targetFormat ของ model เมื่อไม่มี transport ตรงกับ client (muse ยิงผิด URL → 400 `unknown parameter input`) | ACTIVE |
-| `f2d5bba4` | `open-sse/executors/muse.js`, `open-sse/executors/index.js` | LP-018: MuseExecutor ย้าย `reasoning_effort` → `reasoning.effort` บน /v1/responses | ACTIVE |
+| `010d2460` | `open-sse/handlers/chatCore.js` | LP-017: เลือก transport ตาม targetFormat ของ model เมื่อไม่มี transport ตรงกับ client (muse ยิงผิด URL → 400 `unknown parameter input`) | ACTIVE / MODIFIED (v0.5.99 — upstream `b00ba1aa` แก้เคส muse แล้ว เหลือ client ที่ไม่มี transport เช่น xiaomi-tokenplan mimo-v2.5-pro-claude) |
+| `f2d5bba4` | `open-sse/executors/muse.js`, `open-sse/executors/index.js` | LP-018: MuseExecutor ย้าย `reasoning_effort` → `reasoning.effort` บน /v1/responses | ACTIVE / KEPT (v0.5.99 — ซ้อนทับ `b00ba1aa` บางส่วน, idempotent) |
 | `d0da91c0` | `open-sse/executors/muse.js` | LP-013 (ขยาย): จำกัดความลึก tool schema ให้ provider `muse` ตรงด้วย | ACTIVE |
-| `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE |
-| `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | ACTIVE |
+| `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE / KEPT (v0.5.99 — upstream clamp max→xhigh; ปรับเทส `muse-responses-wire`) |
+| `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | NEEDS_REVIEW (v0.5.99 — `b00ba1aa` น่าจะครอบแล้ว เทสผ่านโดยไม่มี forceStream แต่ยังไม่ยืนยัน live) |
 | `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy + ยืนยัน live แล้ว; ไม่ครอบคลุม signature ของ kimi → LP-022) |
 | `5c96c99e`, `4e8d2f28` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (deploy + ยืนยัน live ทั้ง 2 commit) |
 | `0a8e550c` | `open-sse/utils/stream.js`, `open-sse/handlers/chatCore/streamingHandler.js` | LP-023: stream Claude→Claude (passthrough) ถอดชื่อ tool ที่ถูก cloak (`_ide`) กลับ | ACTIVE (deploy + ยืนยัน live แล้ว) |
 | `a5027546` | `open-sse/handlers/chatCore/nonStreamingHandler.js` | LP-024 (เดิม Bug D): non-stream ที่ target เป็น Gemini/Antigravity/Claude/Ollama แปลงต่อจาก chat.completion เป็นรูปแบบของ client (Claude message / Responses) | ACTIVE (deploy + ยืนยัน live แล้ว) |
-| `35f6bbe9` | `open-sse/executors/codex.js` | LP-025: ส่ง `strict:false` ให้ function tool ของ Codex เมื่อ client ไม่ได้ระบุ (กัน codex ใส่ optional argument ครบทุกตัว) | ACTIVE (deploy + ยืนยัน live แล้ว) |
+| `35f6bbe9` | `open-sse/executors/codex.js` | LP-025: ส่ง `strict:false` ให้ function tool ของ Codex เมื่อ client ไม่ได้ระบุ (กัน codex ใส่ optional argument ครบทุกตัว) | ACTIVE / MODIFIED (v0.5.99 — upstream `0dd4d6be` เก็บ strict ที่ระบุมา; เหลือ default `false`) |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
+
+## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.99 — 2026-10-15
+
+Upstream: `upstream/master` = commit `ce4460ef` "# v0.5.99 (2026-10-08)" (29 commits, 163 files เทียบกับ `v0.5.95`) — **upstream ไม่ได้สร้าง tag `v0.5.99`** (tag ล่าสุดยังเป็น `v0.5.95`) จึงอ้างด้วย commit
+Merge commit ของ fork: `3353e5fe` (ทำบน branch `upgrade/v0.5.99` แล้ว fast-forward `master`) — ใช้ merge ตามแบบรอบก่อน ไม่ rebase เพราะประวัติที่ push แล้วมี merge commit
+ตรวจ implementation จริงของ upstream ทุกตัว + probe runtime ไม่ได้ตัดสินจาก changelog/ชื่อ commit
+
+### ไฟล์ที่ upstream แตะทับแพตช์ (16 ไฟล์ที่ทั้งสองฝั่งแก้)
+
+| ไฟล์ | upstream commit ใน v0.5.95..v0.5.99 | ผลต่อแพตช์ |
+|---|---|---|
+| `open-sse/executors/codex.js` | `0dd4d6be` (preserve explicit tool strict flags) | **conflict** — บรรทัดเดียวกับ LP-025 |
+| `tests/unit/codex-tool-normalization.test.js` | `0dd4d6be` | auto-merge แต่ **assertion ขัดกับ LP-025** (unspecified → ไม่มี `strict`) |
+| `open-sse/handlers/chatCore.js` | `b00ba1aa` (muse: transport ตาม targetFormat + ขยายกิ่ง forced-SSE ให้ Responses) | auto-merge แต่**ซ้อนทับเชิง logic** กับ LP-017 / LP-029 / LP-030 |
+| `open-sse/translator/concerns/thinkingUnified.js` | `b00ba1aa` (format `openai-responses` ซ้อน `reasoning.effort` ให้ muse) | auto-merge — ซ้อนทับ LP-018 (export `resolveFormat` ของ LP-037 ยังอยู่) |
+| `open-sse/providers/capabilities.js` | `a07ed95b` (row `claude-opus-5-5*` แบบ always-thinking), `0f7f6e72`/`c61ee37d` (GLM-5.2/5.3 pattern 1M, ปิด thinking ไม่ได้), MiniMax Code | auto-merge — เปลี่ยนผลของ LP-037 กับ Opus 5.5 (ดูด้านล่าง) |
+| `open-sse/providers/pricing.js` | `a07ed95b` (row Claude 5.5 `-high/-medium/-low/-thinking`) | auto-merge คนละบล็อกกับ LP-008/009/039 |
+| `open-sse/providers/thinkingLevels.js` | `63de82b8` (codebuddy-cn), `85bc33ce` (minimax-code) | auto-merge คนละบล็อกกับ LP-019/LP-027 |
+| `open-sse/translator/formats/gemini.js` | `09f6d395` (`ensureObjectType` ไม่ลงไปใน map `properties`), `625df74d`, `6e4f82db` | auto-merge คนละฟังก์ชันกับ LP-006/LP-026 |
+| `open-sse/utils/usageTracking.js`, `chatCore/requestDetail.js` | `46627249` (Ollama `prompt_eval_cached_count`) | auto-merge คนละกิ่งกับ LP-038 / LP-032 |
+| `open-sse/executors/default.js`, `antigravity.js`, `index.js` | `85bc33ce` (minimaxHeaders), antigravity `parseError`, executor bedrock/minimax-code | auto-merge คนละบล็อกกับ LP-004 / LP-026 / ลงทะเบียน `MuseExecutor` |
+| `src/lib/db/schema.js` | `d8c585fb` (per-key access: `apiKeys.accessRestricted/accessAllow`) | auto-merge — **ทั้งสองฝั่ง bump `SCHEMA_VERSION` 1→2 บรรทัดเดียวกัน** ดู ⚠️ ด้านล่าง |
+| `CHANGELOG.md`, `tests/__baseline__/providers-baseline.json` | release notes / snapshot | auto-merge |
+
+### ผลประเมินรายแพตช์
+
+| Patch | ผล | หลักฐานที่ตรวจจริงใน v0.5.99 |
+|---|---|---|
+| Patch 1 — strip effort suffix ใน capabilities | KEPT | upstream แก้ pattern GLM-5.2/5.3 200k→1M (`0f7f6e72`) = ชั้นที่ 2 ของ root cause แต่ยังไม่ strip suffix (`replace(/\(` 0 hit) probe: **34/53** canonical model ได้ caps ต่างกันเมื่อมี `(high)` ถ้าไม่มีแพตช์ เช่น `claude-opus-5-5(high)` → `thinkingCanDisable:true` (ผิด), `glm-5.2(high)` → maxOutput 128000 แทน 131072 |
+| Patch 2 — Combo `[1m]` | REDUNDANT สำหรับ chat path (คงเดิม) | `stripModelContextMarker` ยังอยู่ใน `chat.js`; `tts.js` / `imageGeneration.js` ยัง 0 hit |
+| LP-003 / LP-021 / LP-022 — Claude thinking | KEPT | upstream ไม่แตะ `translator/formats/claude.js`; บล็อก retry ของ LP-022 ใน `chatCore.js` รอดทั้งก้อน |
+| LP-004 — native client version | KEPT | `default.js` ของ upstream เพิ่มแค่ `minimaxHeaders` ยังไม่อ่าน `user-agent` ของ client |
+| LP-006 — Gemini schema annotations | KEPT | `09f6d395` แก้ `ensureObjectType` (property ชื่อ `properties`) คนละเรื่อง; `isPropertyMap` ยัง 0 hit |
+| LP-008 / LP-009 / LP-010 / LP-011 / LP-012 | KEPT | pricing upstream เพิ่มแค่ row Claude 5.5; ไม่มี glob gpt-6 / strip suffix / warn / `DATA_DIR` / backfill |
+| LP-013 / LP-036 / LP-028 — `MuseExecutor` | KEPT | upstream ไม่มี executor ของ muse |
+| LP-016 / LP-023 / LP-024 / LP-031 / LP-033 / LP-035 | KEPT | upstream ไม่แตะไฟล์ของแพตช์ (`sseToJsonHandler`, `stream.js`, `nonStreamingHandler`, `streamToJsonConverter`, `usage/page.js`, `streamHandler`) |
+| **LP-017** — transport ตาม targetFormat | **MODIFIED (CASE C)** | `b00ba1aa` เลือก `modelTargetTransport` เมื่อ `supportedFormats` ไม่มี format ของ client = เคส muse เดิม probe ทุก provider × model × client format (**3,756** ชุด) ต่างจาก upstream เหลือ **2**: `xiaomi-tokenplan/mimo-v2.5-pro-claude` จาก client Responses/Gemini (ไม่มี transport ของ client, targetFormat `claude` ≠ default `openai` → upstream ส่ง body Claude ไป URL default) โค้ดไม่เปลี่ยน (fallback ทำงานเฉพาะเมื่อ `useTransport` เป็น null) ปรับ comment ให้ตรงขอบเขตใหม่ |
+| **LP-018** — `reasoning_effort` → `reasoning.effort` | KEPT (ซ้อนทับบางส่วน) | `b00ba1aa` ซ้อน effort ให้ muse ตอน `applyThinking` แล้ว ส่วนใน `MuseExecutor` ยัง idempotent และครอบ body ที่ไม่ผ่าน `applyThinking` (passthrough Responses) — executor ต้องคงไว้อยู่แล้วเพราะ LP-028/LP-036/LP-013 |
+| **LP-019** — muse-spark levels ถึง `max` | KEPT + ปรับเทส upstream | upstream ไม่มี row muse-spark จึง clamp `max`→`xhigh` และเทสใหม่ `muse-responses-wire` assert แบบนั้น — ขัดกับหลักฐาน LP-019 (Meta ตอบ `Supported values: [minimal … max]` + live 200 ด้วย `effort:"max"`) → เปลี่ยน assertion เป็น "keeps max" |
+| **LP-020** — `forceStream` ให้ muse | **NEEDS_REVIEW** | `b00ba1aa` ส่ง client non-stream บน upstream Responses เข้า `handleForcedSSEToJson` โดยไม่ต้อง `forceStream` ทดลองปิด `forceStream` → เทส muse/non-stream **37/37 ผ่าน** และ body ที่แปลงแล้วยังถูก pin `stream:true` → ดูเหมือน upstream ครอบแล้ว แต่ยังต่างที่ `stream` flag / `Accept` ที่ส่งให้ executor และ**ยังไม่ได้ยืนยัน live** จึงยังไม่ถอด — ถอดได้เมื่อ probe non-stream (client Claude + OpenAI) บน `muse/…` แบบไม่มี `forceStream` ผ่าน |
+| LP-025 — Codex `strict` | **MODIFIED (CASE C)** | `0dd4d6be` เก็บ `strict` ที่ client ระบุมาแล้ว → delta เหลือบรรทัดเดียว: ไม่ระบุ → `false` (upstream ปล่อยว่าง ซึ่งคือเคสที่ทำให้ codex เติม optional ครบ) เทส upstream ปรับ assertion ตัวที่ 5 เป็น `false` |
+| LP-026 — placeholder `reason` | KEPT | `gemini.js` upstream ยัง `required: ["reason"]` (บรรทัด 415–432); `antigravity.js` upstream เพิ่มแค่ `parseError` |
+| LP-027 | KEPT | thinkingLevels upstream เปลี่ยนแค่ codebuddy-cn / minimax-code |
+| LP-029 | KEPT | กิ่งของ upstream คืน null เมื่อ body ไม่ใช่ SSE แล้วตกต่อด้วย `stream=true` (provider forceStream) → ห่อ JSON เป็น SSE เหมือนเดิมถ้าไม่มีแพตช์ หมายเหตุ: เพราะ upstream ขยายเงื่อนไข LP-029 จึงครอบ provider Responses ที่ไม่ forceStream ด้วย (client ที่ไม่ได้ขอ stream ได้ JSON — ตรงเจตนาของ upstream) |
+| **LP-030** | **MODIFIED (CASE C)** | กิ่งของ upstream ครอบ client OpenAI/Claude/Responses ที่ไม่ stream แล้ว เหลือเฉพาะ source ตระกูล Gemini (`clientRequestedStreaming` ถูกบังคับ true แม้ `stream=false`) ซึ่ง `handleForcedSSEToJson` รองรับ (`sseToJsonHandler.js:280`) โค้ดไม่เปลี่ยน ปรับ comment |
+| LP-032 — Sessions | KEPT + ⚠️ schema | ดูหัวข้อ `SCHEMA_VERSION` ด้านล่าง |
+| LP-034 | KEPT (นอก repo) | plist / rotate script ไม่ถูกแตะโดยการติดตั้ง |
+| **LP-037** — suffix effort ใน passthrough | KEPT + ปรับเทส | `a07ed95b` เพิ่ม row `claude-opus-5-5` แบบ `thinkingCanDisable:false` (always-thinking เหมือน Fable 5.1) → `applyThinking` ส่งแค่ `output_config.effort` ไม่ส่ง `thinking` — ตรงกับเส้น translate ของ upstream (`claude-opus-5-5.test.js`) แพตช์ยังทำงาน (`(high)` → effort high) เทส adaptive-switch ย้ายไปใช้ `claude-opus-5`, เทส e2e Opus 5.5 คาด `thinking` undefined |
+| LP-038 / LP-039 | KEPT | Ollama cached อยู่คนละกิ่ง; upstream ไม่มี `haiku-5` ใน capabilities/pricing (0 hit) |
+
+### ⚠️ `SCHEMA_VERSION` ชนกัน (LP-032 vs per-key access ของ upstream)
+
+ทั้ง LP-032 (`sessionId` ใน `usageHistory`) และ upstream `d8c585fb` (`apiKeys.accessRestricted`, `accessAllow`) bump `SCHEMA_VERSION` 1→2 — git รวมเป็นบรรทัดเดียว
+DB ที่ใช้งานจริงมี `backupSchemaVersion = 2` อยู่แล้วจาก LP-032 → ตอน boot ครั้งแรกบน v0.5.99 คอลัมน์ใหม่ของ `apiKeys` ถูกเพิ่มแบบ additive ตามปกติ
+แต่ **จะไม่มี pre-schema backup อัตโนมัติ** (`migrate.js:233-240` เทียบแค่เลขเวอร์ชัน) → ต้องสำรอง SQLite เองก่อนติดตั้ง (ขั้นตอน install ทำอยู่แล้ว)
+ไม่ bump เป็น 3 ใน fork เพราะจะชนกับเลขของ upstream รอบถัดไปอีก — **รอบหน้าถ้า upstream bump เป็น 3 ให้เช็คว่าเลขของ DB จริงไม่นำหน้า**
+
+### Validation (2026-10-15)
+
+- **Full suite (เทียบราย assertion กับ master ก่อน merge):** master 3,289 tests / 100 failed → หลัง merge **3,694 tests / 3,492 passed / 103 failed**
+  **ไม่มี regression จากแพตช์หรือ merge** — ที่เพิ่มแดง 3 รายการ:
+  - `combo-caps-resolver` "falls back to the pattern default without a resolver" — แดงเหมือนกันบน worktree **upstream v0.5.99 เปล่า** (เทสค้างของ upstream: `0f7f6e72` เปลี่ยน pattern GLM เป็น 1M แต่เทสยังคาด 200k)
+  - `golden-url-header` minimax-code / minimax-code-global — แดง**เฉพาะรอบที่ 2** ขึ้นไป: upstream เลิก track snapshot ไฟล์นี้ (`2203cd8f`) และ `minimaxHeaders` ใส่ `X-Mavis-Session-Id` เป็น `randomUUID()` → รอบแรกเขียน snapshot ใหม่ รอบถัดไป UUID ไม่ตรง; รันสดหลังลบ snapshot ที่ vitest เขียนไว้ = 148/148 (ไม่ได้ commit ไฟล์ snapshot)
+- **ระหว่างทาง (ก่อนแก้):** merge ดิบมี pass→fail 5 (LP-037 ×4 + combo-caps) และเทสใหม่แดง 1 (muse max) — แก้ตามตารางด้านบนแล้ว
+- **Patch regression tests:** 25 ไฟล์ 309 tests → 306 ผ่าน; แดง 3 = ของเดิมบน master ทั้งหมด (`thinking-unified` GLM-5.2 reasoning_effort, `codex-gpt6-lite` gpt-6.1-sol caps, `translator-helpers-edge` haiku hoist)
+- **Baselines:** ผล `verify-providers` / `verify-alias` **เท่ากับ upstream v0.5.99 เปล่าทุกตัวอักษร** (snapshot ค้างของ upstream: `codex.headers` 0.155→0.159, `kimi.transports` +openai-responses จาก `3125ac2b`, alias idToAlias/modelKeys) — แพตช์ไม่เพิ่ม diff; OAuth URLs ✅
+- **ESLint:** ไฟล์แพตช์ + ไฟล์ที่ resolve ผ่าน · **Build:** `npm run build` ผ่านที่ 0.5.99 (รวม postbuild)
+- **Versions:** root + CLI = **0.5.99** (merge พามา); dependency ใหม่ `enquirer`, optional `@aws-sdk/credential-providers` (`package-lock.json` ถูก gitignore — ต้อง `npm install` หลัง pull)
+
+### Security notes ของ upstream v0.5.99 (ตรวจโดย deep-reasoner, read-only)
+
+- ไม่มี HIGH — per-key access control (`d8c585fb`) **fail-closed** (allow list เสีย → deny ทั้งหมด, DB error → 500) ตรวจก่อนดึง credential ทุก route `/v1` ที่มี model; `[1m]` ถูก strip ก่อนตรวจ; ชื่อมี `(high)` / ตัวพิมพ์ต่าง → deny
+- **MEDIUM (เฉพาะเมื่อ `requireLogin=false`):** `src/app/api/cli-tools/hermes-settings/hermesYaml.js:24-31,117-121` เขียน `model`/`baseUrl`/`role`/`apiKey` ลง YAML และ `~/.hermes/.env` โดยไม่ escape (`role` ถูกใช้สร้าง RegExp ด้วย) → ถ้าปิด login, POST ข้ามไซต์ฉีดตัวแปร env หรือชี้ `baseUrl` ไปเครื่องคนอื่นได้ (cookie เป็น SameSite=Lax จึงกันได้เมื่อเปิด login)
+- LOW: request ที่ไม่มี key ถือว่าไม่จำกัด (loopback ไม่ต้องมี key ถ้า `requireApiKey=false`) — key ที่จำกัดสิทธิ์จึงมีผลกับ remote/tunnel เท่านั้น; `GET /v1/videos/{id}` ไม่ผ่าน per-key check; Netlify relay เป็น open proxy แบบเดียวกับ relay Vercel/Cloudflare/Deno เดิม (token ของ Netlify ไม่ถูกเก็บ/log/คืนให้ client)
+- AWS (Bedrock SSO/profile) และ Hermes profile path traversal: ไม่พบปัญหา
+- ไม่ได้แก้ในรอบนี้ (นอกขอบเขต upgrade) — ผู้สมัครเป็น LP แยก: ปฏิเสธ CR/LF/quote ใน `apiKey`/`model`/`baseUrl` และจำกัด `role` เป็น `^[A-Za-z0-9_]+$`
 
 ## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.95 — 2026-10-02
 
@@ -782,7 +858,7 @@ chat SSE tool call→tool_use); เทสที่เกี่ยวข้อง
 
 ## LP-017 / LP-018 / LP-019 / LP-020: combo `9-fast-worker` ใช้ `muse/muse-spark-1.3-contributor(max)` แล้ว HTTP 400 (provider `muse` ตรงของ Meta)
 
-**Status:** ACTIVE · **Commits:** `010d2460` (LP-017), `f2d5bba4` (LP-018), `d0da91c0` (LP-013 ขยาย), `db547565` (LP-019), `b528c903` (LP-020), test `dc84b0ab` · **Implemented:** 2026-10-02
+**Status:** ACTIVE — v0.5.99: LP-017 MODIFIED, LP-018/LP-019 KEPT, LP-020 **NEEDS_REVIEW** (ดูหัวข้อ v0.5.99) · **Commits:** `010d2460` (LP-017), `f2d5bba4` (LP-018), `d0da91c0` (LP-013 ขยาย), `db547565` (LP-019), `b528c903` (LP-020), test `dc84b0ab` · **Implemented:** 2026-10-02
 **Upstream:** provider `muse` เพิ่งมาใน v0.5.95 (`28809807`); `upstream/master` = v0.5.95 ไม่มี commit แก้, ไม่มี issue ที่ตรง → CASE A
 
 **อาการ:** ใส่ `muse/muse-spark-1.3-contributor(max)` เป็นตัวแรกของ `9-fast-worker` แล้วทุก request ได้
@@ -979,7 +1055,7 @@ ag + tool ได้ `tool_use` + `stop_reason:"tool_use"`; client `/v1/responses
 
 ## LP-025: Codex ใส่ optional argument ของ tool ครบทุกตัว (Agent `model`/`isolation:"worktree"`, Read `offset/limit` …)
 
-**Status:** ACTIVE · **Commit:** `35f6bbe9` (deploy พร้อม LP-024 ใน build `a5027546`) · **Implemented:** 2026-10-03 · **Upstream:** ยังไม่แก้ (v0.5.95)
+**Status:** ACTIVE / MODIFIED (v0.5.99) · **Commit:** `35f6bbe9` (deploy พร้อม LP-024 ใน build `a5027546`) · **Implemented:** 2026-10-03 · **Upstream:** แก้บางส่วนใน `0dd4d6be` (v0.5.99: เก็บ `strict` ที่ client ระบุ แต่ไม่ตั้ง default) → delta เหลือ "ไม่ระบุ → `false`"
 (LP-024 จองไว้ให้ Bug D)
 
 **อาการ (ทดสอบ `9-orchestrator` ที่ย้าย `cx/gpt-6.1-sol-high` ขึ้นเป็นตัวแรก 2026-10-03):** ทุก tool call ของ codex ใส่ optional ครบ
@@ -1059,7 +1135,7 @@ Claude Code จริง `9-haiku-level` เรียก `TaskList` 3/3 ได�
 
 ## LP-028 / LP-029 / LP-030: client `/v1/responses` (Codex CLI / Responses SDK) บน muse และ ocg
 
-**Status:** ACTIVE · **Commits:** `df7999a5` (LP-028), `6a389c60` (LP-029), `cb1a19d1` (LP-030) · **Implemented:** 2026-10-03 · พบตอนยืนยัน LP-027
+**Status:** ACTIVE — v0.5.99: LP-028/LP-029 KEPT, LP-030 MODIFIED (เหลือ source ตระกูล Gemini) · **Commits:** `df7999a5` (LP-028), `6a389c60` (LP-029), `cb1a19d1` (LP-030) · **Implemented:** 2026-10-03 · พบตอนยืนยัน LP-027
 ไม่กระทบ Claude Code (`/v1/messages`) — เฉพาะ client ที่ใช้ `/v1/responses`
 
 **LP-028 — `muse/…(effort)` → 400 `unknown parameter \`reasoning_effort\``:** `MuseExecutor` (LP-018) ย้าย `reasoning_effort` → `reasoning.effort` เฉพาะเมื่อ `input` เป็น array
@@ -1250,7 +1326,7 @@ request ที่ cache 0 ใช้เวลานานกว่า (13–20 �
 
 ## LP-037: suffix effort ใน combo (`cc/claude-opus-5-5(high)`) ไม่มีผลกับ request แบบ passthrough
 
-**Status:** ACTIVE · **Commit:** `1271470a` · **Implemented:** 2026-10-04 · พบจากการเทียบ native vs 9router (`analysis/x-importdup-native-vs-9router.html`)
+**Status:** ACTIVE / KEPT (v0.5.99 — Opus 5.5 ไม่ได้ `thinking` switch แล้ว ส่ง effort อย่างเดียวตาม upstream `a07ed95b`) · **Commit:** `1271470a` · **Implemented:** 2026-10-04 · พบจากการเทียบ native vs 9router (`analysis/x-importdup-native-vs-9router.html`)
 
 **อาการ:** ตั้ง combo `9-orchestrator` = `cc/claude-opus-5-5(high)` แต่ log ขึ้น `THINK:32k` ทุก request — 2026-10-04 ทั้งวัน `claude/*` 447/447 request เป็น `32k` ไม่ว่า combo จะตั้ง `(high)` หรือ `(medium)`
 ขณะที่ provider ที่ต้องแปลง format ได้ตาม combo ครบ (muse `(max)` → max, codex `(high)` → high, glm `(max)` → max)

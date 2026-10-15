@@ -96,6 +96,12 @@ export const ANTIGRAVITY_IDE_VERSION = "2.11.0";
 export const ANTIGRAVITY_IDE_BASE_URL = "https://daily-cloudcode-pa.googleapis.com";
 export const ANTIGRAVITY_IDE_USER_AGENT = `antigravity/ide/${ANTIGRAVITY_IDE_VERSION} darwin/arm64`;
 
+// LP-040: Gemini 4 Argon is served only to the agy CLI identity — the IDE
+// User-Agent gets 404 "Requested entity was not found." on the same account.
+// Fingerprint captured from agy 1.3.5 (macOS arm64) on 2026-10-15.
+export const ANTIGRAVITY_CLI_USER_AGENT = "antigravity/cli/1.3.5 (aidev_client; os_type=darwin; arch=arm64; cl=998863838; auth_method=consumer)";
+export const ANTIGRAVITY_CLI_ONLY_MODEL_PREFIXES = ["gemini-4-argon"];
+
 // Antigravity OAuth client credentials (public CLI client — duplicated in usage.js + src/lib/oauth)
 export const ANTIGRAVITY_OAUTH_CLIENT = {
   clientId: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",

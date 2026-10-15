@@ -8,6 +8,7 @@ import { proxyAwareFetch } from "../utils/proxyFetch.js";
 import { cleanJSONSchemaForAntigravity, normalizeGeminiContents } from "../translator/formats/gemini.js";
 import { schemaPlaceholderProperties } from "../translator/concerns/schemaPlaceholder.js";
 import { DEFAULT_THINKING_AG_SIGNATURE } from "../config/defaultThinkingSignature.js";
+import { ANTIGRAVITY_CLI_USER_AGENT, ANTIGRAVITY_CLI_ONLY_MODEL_PREFIXES } from "../providers/shared.js";
 import { getGeminiThoughtSignatureSync } from "../services/thoughtSignatureStore.js";
 
 // Sanitize function name: Gemini requires [a-zA-Z_][a-zA-Z0-9_.:\-]{0,63}
@@ -162,11 +163,16 @@ export class AntigravityExecutor extends BaseExecutor {
 
   // sessionId comes from transformRequest output; base.execute runs transformRequest before
   // buildHeaders, so we read it from instance state cached there (fallback: explicit arg).
-  buildHeaders(credentials, stream = true, sessionId = null) {
+  buildHeaders(credentials, stream = true, sessionId = null, model = null, body = null) {
+    // LP-040: CLI-only models (Gemini 4 Argon) 404 under the IDE User-Agent.
+    const wireModel = String(body?.model || model || "");
+    const cliOnly = ANTIGRAVITY_CLI_ONLY_MODEL_PREFIXES.some((prefix) => wireModel.startsWith(prefix));
     return {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${credentials.accessToken}`,
-      "User-Agent": this.config.headers?.["User-Agent"] || ANTIGRAVITY_HEADERS["User-Agent"],
+      "User-Agent": cliOnly
+        ? ANTIGRAVITY_CLI_USER_AGENT
+        : (this.config.headers?.["User-Agent"] || ANTIGRAVITY_HEADERS["User-Agent"]),
     };
   }
 

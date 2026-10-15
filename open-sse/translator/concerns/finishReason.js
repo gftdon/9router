@@ -1,6 +1,6 @@
 // Concern #6: finish_reason / stop_reason mapping.
 // One entry per direction; switch by special format, default handles common providers.
-import { OPENAI_FINISH, CLAUDE_STOP, GEMINI_FINISH } from "../schema/finishReasons.js";
+import { OPENAI_FINISH, CLAUDE_STOP, GEMINI_FINISH, RESPONSES_INCOMPLETE } from "../schema/finishReasons.js";
 
 // upstream finish/stop reason → OpenAI finish_reason
 export function toOpenAIFinish(reason, format) {
@@ -35,6 +35,13 @@ export function toOpenAIFinish(reason, format) {
         case GEMINI_FINISH.RECITATION:
         case GEMINI_FINISH.BLOCKLIST:
         case GEMINI_FINISH.PROHIBITED_CONTENT: return OPENAI_FINISH.CONTENT_FILTER;
+        default: return OPENAI_FINISH.STOP;
+      }
+    // LP-041: Responses incomplete_details.reason from a response.incomplete event.
+    case "openai-responses":
+      switch (reason) {
+        case RESPONSES_INCOMPLETE.MAX_OUTPUT_TOKENS: return OPENAI_FINISH.LENGTH;
+        case RESPONSES_INCOMPLETE.CONTENT_FILTER: return OPENAI_FINISH.CONTENT_FILTER;
         default: return OPENAI_FINISH.STOP;
       }
     case "kiro":

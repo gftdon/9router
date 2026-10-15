@@ -96,7 +96,16 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   // sourceFormat-matched transport if that format is declared (opencode-go models
   // differ — kimi/glm only do /chat/completions). Undeclared models keep the
   // upstream default (use the transport), preserving behavior for glm/deepseek/...
-  const useTransport = (!modelSupportedFormats || modelSupportedFormats.includes(sourceFormat)) ? runtimeTransport : null;
+  // When the client's wire format is NOT among the model's supportedFormats, fall
+  // back to the transport for the model's declared targetFormat so the URL always
+  // matches the translated body. Without this, a Responses-only model (e.g. Muse
+  // Spark: supportedFormats ["openai-responses"]) requested by an OpenAI client is
+  // translated to the Responses body (`input`) yet POSTed to the default Chat
+  // Completions URL, and upstream rejects it: "unknown parameter `input`".
+  const modelTargetTransport = modelTargetFormat ? resolveTransport(provider, modelTargetFormat) : null;
+  const useTransport = (!modelSupportedFormats || modelSupportedFormats.includes(sourceFormat))
+    ? runtimeTransport
+    : modelTargetTransport;
   // A source-format-matched endpoint keeps the request lossless. Prefer it
   // over a model-level targetFormat, which is only the fallback for clients
   // whose wire format has no supported transport (for example MiniMax-M3:
@@ -104,10 +113,11 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   // back to its declared Claude target).
   const defaultFormat = getTargetFormat(provider, credentials);
   const targetFormat = useTransport?.format || modelTargetFormat || defaultFormat;
-  // LP-017: when the model's targetFormat (not the client's) picks the wire and
-  // it differs from the default endpoint, send to the transport for that format
-  // too — otherwise a Responses body lands on /chat/completions (Muse: HTTP 400
-  // "unknown parameter `input`"). Same-format cases keep the default endpoint.
+  // LP-017: upstream now covers a supportedFormats mismatch (modelTargetTransport).
+  // Still needed when the client's format has no transport at all and the model's
+  // targetFormat differs from the default endpoint (xiaomi-tokenplan
+  // mimo-v2.5-pro-claude from a Responses/Gemini client) — otherwise the translated
+  // body lands on the default URL. Same-format cases keep the default endpoint.
   const wireTransport = useTransport
     || (targetFormat !== defaultFormat ? resolveTransport(provider, targetFormat) : null);
   if (wireTransport && credentials) credentials.runtimeTransport = wireTransport;
@@ -549,8 +559,11 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   const appendLog = (extra) => appendRequestLog({ model, provider, connectionId, ...extra }).catch(() => { });
   const trackDone = () => trackPendingRequest(model, provider, connectionId, false);
 
-  // Provider forced streaming but client wants JSON
-  if (!clientRequestedStreaming && providerRequiresStreaming) {
+  // Provider forced streaming but client wants JSON. The Responses wire always
+  // streams upstream (openaiToOpenAIResponsesRequest pins stream:true), so a
+  // non-stream OpenAI/native client behind a Responses upstream must also take
+  // this path — handleForcedSSEToJson returns null when the body is not SSE.
+  if (!clientRequestedStreaming && (providerRequiresStreaming || providerResponseFormat === FORMATS.OPENAI_RESPONSES)) {
     const result = await handleForcedSSEToJson({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, customToolNames, toolNameMap, trackDone, appendLog });
     if (result) { streamController.handleComplete(); return result; }
     // LP-029: the upstream answered plain JSON (a same-format body kept stream:false,
@@ -561,9 +574,10 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     return nonStream;
   }
 
-  // LP-030: a Responses upstream that always streams (opencode-go pins stream:true)
-  // answers SSE to a non-stream client; the chat SSE parser in the non-stream
-  // handler cannot read Responses events and returned an empty chat.completion.
+  // LP-030: a Responses upstream that always streams answers SSE to a non-stream
+  // client; the chat SSE parser in the non-stream handler cannot read Responses
+  // events. Upstream's branch above now covers this except for Gemini-family
+  // sources, which count as clientRequestedStreaming even when stream is false.
   const upstreamIsSSE = (providerResponse.headers.get("content-type") || "").includes("text/event-stream");
   if (!stream && upstreamIsSSE && providerResponseFormat === FORMATS.OPENAI_RESPONSES) {
     const result = await handleForcedSSEToJson({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, customToolNames, toolNameMap, trackDone, appendLog });

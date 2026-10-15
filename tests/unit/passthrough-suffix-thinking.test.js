@@ -15,9 +15,11 @@ const claudeBody = (extra = {}) => ({
 });
 
 describe("applyPassthroughSuffixThinking — Claude wire", () => {
+  // claude-opus-5 can disable thinking, so it takes the explicit adaptive switch.
+  // Opus 5.5 is always-thinking since upstream v0.5.99 (see the chatCore test below).
   it("turns (high) into adaptive thinking + output_config.effort", () => {
-    const body = claudeBody();
-    expect(applyPassthroughSuffixThinking("claude", "claude-opus-5-5(high)", body, "claude")).toBe("claude-adaptive");
+    const body = claudeBody({ model: "claude-opus-5" });
+    expect(applyPassthroughSuffixThinking("claude", "claude-opus-5(high)", body, "claude")).toBe("claude-adaptive");
     expect(body.thinking).toEqual({ type: "adaptive" });
     expect(body.output_config).toEqual({ effort: "high" });
     expect(body.max_tokens).toBe(32000);
@@ -36,15 +38,16 @@ describe("applyPassthroughSuffixThinking — Claude wire", () => {
     const body = claudeBody({
       thinking: { type: "enabled", budget_tokens: 31999, display: "summarized" },
       output_config: { effort: "low", format },
+      model: "claude-opus-5",
     });
-    applyPassthroughSuffixThinking("claude", "claude-opus-5-5(medium)", body, "claude");
+    applyPassthroughSuffixThinking("claude", "claude-opus-5(medium)", body, "claude");
     expect(body.thinking).toEqual({ type: "adaptive", display: "summarized" });
     expect(body.output_config).toEqual({ format, effort: "medium" });
   });
 
   it("(none) disables thinking", () => {
-    const body = claudeBody();
-    applyPassthroughSuffixThinking("claude", "claude-opus-5-5(none)", body, "claude");
+    const body = claudeBody({ model: "claude-opus-5" });
+    applyPassthroughSuffixThinking("claude", "claude-opus-5(none)", body, "claude");
     expect(body.thinking).toEqual({ type: "disabled" });
     expect(body.output_config).toBeUndefined();
   });
@@ -163,7 +166,8 @@ describe("Claude Code passthrough through chatCore", () => {
   it("sends effort high for cc/claude-opus-5-5(high)", async () => {
     const { sent } = await runClaudeCode("claude-opus-5-5(high)");
     expect(sent.model).toBe("claude-opus-5-5");
-    expect(sent.thinking).toEqual({ type: "adaptive" });
+    // Always-thinking since upstream v0.5.99: effort only, no thinking switch.
+    expect(sent.thinking).toBeUndefined();
     expect(sent.output_config).toEqual({ effort: "high" });
   });
 

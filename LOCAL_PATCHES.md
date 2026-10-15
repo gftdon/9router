@@ -8,10 +8,9 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.99` (`ce4460ef`, upstream ไม่มี tag) — merge `3353e5fe` (2026-10-15); รอบก่อน `v0.5.95` (`a99cf572`) merge `c3deacad` |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-039 (2026-10-08) — **merge v0.5.99 ยังไม่ได้ push** |
-| Build ที่ติดตั้ง global | `9router-0.5.95.tgz` จาก commit `eb2ce4e5` (LP-017..LP-039) — ติดตั้ง 2026-10-08 09:33 (v0.5.99 ยังไม่ได้ติดตั้ง) |
-| Server ที่รันอยู่ | ⚠️ (ตรวจ 2026-10-15) **ไม่ได้รันจาก LaunchAgent** — `com.9router.autostart` สถานะ `-9` (ไม่รัน); ตัวที่รันคือ `9router` ที่ผู้ใช้เปิดเองจาก zsh (PID 6337, เริ่ม 2026-10-10 09:44, v0.5.95) จึงไม่มี `--log` และ `~/.9router/logs/server.log` ไม่ถูกเขียนตั้งแต่ 2026-10-10 09:42 (LP-034 ใช้ได้เฉพาะเมื่อรันผ่าน LaunchAgent) |
-| แพ็กเกจ v0.5.99 ที่ build ไว้ | `9router-0.5.99.tgz` จาก `00499504` (15,663,140 bytes, SHA-256 `235958a6a28f0ea085c9344d93450f273803ffdff2dae5acb920b36c00972ec8`) — **ผู้ใช้สั่งยังไม่ deploy / ยังไม่ push (2026-10-15)**; ตอน deploy: สำรอง global + SQLite ก่อน (ไม่มี pre-schema backup อัตโนมัติ — ดู ⚠️ `SCHEMA_VERSION` ในหัวข้อ v0.5.99), ปิดตัวที่รันอยู่ก่อน `npm install --global`, แล้ว probe `cc/claude-opus-5-5(high)` (LP-037: ต้องยังมี thinking block ในคำตอบแม้ไม่ส่ง `thinking` switch) + `muse/…` non-stream (LP-020) |
+| `origin/master` (`gftdon/9router`) | push ครบถึง LP-039 (2026-10-08) — **merge v0.5.99 + LP-040 ยังไม่ได้ push** (รอผู้ใช้สั่ง) |
+| Build ที่ติดตั้ง global | `9router-0.5.99.tgz` จาก commit `9b61ee41` (v0.5.99 + LP-040; 15,663,725 bytes, SHA-256 `475fa91d154dc496c20035f5e6fd867939941f0ea17dac9574e66ee81a1553c3`) — ติดตั้ง 2026-10-15 09:11 · สำรองตัวเดิม (0.5.95) + SQLite (`.backup` แบบ online, integrity ok) + plist ที่ `/tmp/9router-before-v0599-20261015/` (0700/0600) |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-10-15 09:11:49 (launcher PID 56074, listener 56101); `server.log` กลับมาเขียนแล้ว (LP-034) · ก่อนหน้านี้ (10–15 ต.ค.) ตัวที่รันเป็น `9router` ที่เปิดเองจาก zsh ไม่มี `--log` — ปิด launcher ก่อนแล้วค่อยปิด server ตอนติดตั้ง |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | LP-020 `NEEDS_REVIEW` (v0.5.99) — probe non-stream บน `muse/…` แบบไม่มี `forceStream` ก่อนถอด · Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.99) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
@@ -26,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `9b61ee41` | `open-sse/executors/antigravity.js`, `open-sse/providers/{shared.js,registry/antigravity.js,capabilities.js,pricing.js}` | LP-040: Gemini 4 Argon บน Antigravity — Google ให้เฉพาะ User-Agent ของ `agy` CLI (UA แบบ IDE ได้ 404) → ส่ง UA แบบ CLI **เฉพาะ** `gemini-4-argon*` + ลงทะเบียน `ag/gemini-4-argon-{high,medium,low}` และ `ag/gemini-4-argon` (→ medium) + caps + ราคา | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-15 09:13) |
 | `3848a5e2` + `eb2ce4e5` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js`, `open-sse/providers/pricing.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget · ราคา Haiku 5.5 แบบ 2 ขั้นตามความยาว prompt ($0.10/$0.50 ≤100k, $0.50/$2.50 >100k; เดิมตก glob Haiku 4.5 แพง 10 เท่า) | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-08 09:33) |
 | `c9dedf5e` | `open-sse/utils/usageTracking.js` | LP-038: Kimi stream ส่ง `message_start` แบบไม่มี cache (input = prompt ทั้งก้อน) แล้วค่อยแยก cache ใน `message_delta` → max-merge นับ cache ซ้ำ (input ~2 เท่า, cache ดูเหลือ 50%) · ให้ delta ที่มี `input_tokens` ทับค่าฝั่ง prompt | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-05 15:39) |
 | `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE / KEPT (v0.5.99 — Opus 5.5 เป็น always-thinking ตาม upstream `a07ed95b`: ส่ง effort อย่างเดียว; ปรับเทส) |
@@ -131,6 +131,20 @@ DB ที่ใช้งานจริงมี `backupSchemaVersion = 2` อ�
 - **Baselines:** ผล `verify-providers` / `verify-alias` **เท่ากับ upstream v0.5.99 เปล่าทุกตัวอักษร** (snapshot ค้างของ upstream: `codex.headers` 0.155→0.159, `kimi.transports` +openai-responses จาก `3125ac2b`, alias idToAlias/modelKeys) — แพตช์ไม่เพิ่ม diff; OAuth URLs ✅
 - **ESLint:** ไฟล์แพตช์ + ไฟล์ที่ resolve ผ่าน · **Build:** `npm run build` ผ่านที่ 0.5.99 (รวม postbuild)
 - **Versions:** root + CLI = **0.5.99** (merge พามา); dependency ใหม่ `enquirer`, optional `@aws-sdk/credential-providers` (`package-lock.json` ถูก gitignore — ต้อง `npm install` หลัง pull)
+
+### Deploy + live verification (2026-10-15)
+
+- ติดตั้ง `9router-0.5.99.tgz` จาก `9b61ee41` (v0.5.99 + LP-040) → `launchctl kickstart` → `/api/health` = `{"ok":true}`, banner `🚀 9router v0.5.99`
+- **DB migrate ตอนเปิด DB ครั้งแรก (lazy):** `_meta.appVersion` 0.5.95 → 0.5.99, `apiKeys` ได้คอลัมน์ `accessRestricted` / `accessAllow`, `backupSchemaVersion` คง 2
+  → **ไม่มี pre-schema backup อัตโนมัติ** ตามที่คาดไว้ — backup ที่ใช้ได้คือ `/tmp/9router-before-v0599-20261015/data.sqlite` ที่สำรองเองก่อนติดตั้ง
+- **Live probe (ผ่าน gateway จริง):**
+  - `ag/gemini-3.8-flash` 200 (UA แบบ IDE เดิม) · `ag/gemini-4-argon-high` 200 `model=gemini-4-argon` reasoning 135 · `ag/gemini-4-argon` 200 · `/v1/messages` stream `ag/gemini-4-argon-high` ครบ `message_start`→thinking→text→`message_stop` (LP-040)
+  - `cc/claude-opus-5-5(high)` passthrough (UA Claude Code) → 200, content `thinking,text`, log `THINK:high` — **LP-037 ยืนยัน: Opus 5.5 ยังคิดแม้ไม่ส่ง `thinking` switch**; `cc/claude-haiku-5-5` 200
+  - `muse/muse-spark-1.3-contributor` non-stream: client OpenAI → `chat.completion` "OK", client Claude → `message` "OK" (LP-020 ยังเปิดอยู่ ไม่ได้ทดสอบการถอด)
+  - `usageHistory` บันทึกครบทุก probe ที่สำเร็จ (cost > 0 รวม Argon; ไม่มี warn `no pricing`)
+- ⚠️ **บทเรียนการ probe Claude:** request ที่ใส่ UA `claude-cli/…` แต่**ไม่มี system prompt ของ Claude Code** จะถูก passthrough ตรงๆ แล้ว Anthropic ตอบ
+  **429 `rate_limit_error` "Error"** (ปลอมเป็น rate limit — ยิงตรงด้วย token เดียวกัน + system prompt ได้ 200, quota 5h ใช้ไป 4%) → ไม่ใช่ regression
+  ของ 9Router ตอน probe เส้น `cc/` ให้ใส่ `system: "You are Claude Code, Anthropic's official CLI for Claude."` เสมอ
 
 ### Security notes ของ upstream v0.5.99 (ตรวจโดย deep-reasoner, read-only)
 
@@ -1435,6 +1449,40 @@ Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router 
 (thinking/effort) ถ้า upstream เพิ่มแถว Haiku 5 เป็น `claude-adaptive` ใน `PATTERN_CAPABILITIES` **และ** แคบ `ADAPTIVE_THINKING_UNSUPPORTED` ให้ไม่จับ Haiku 5 → UPSTREAM_FIXED (ต้องครบทั้งสองจุด ถ้าแก้จุดเดียว → CASE C เก็บจุดที่เหลือ) · ถ้ามี Haiku รุ่นใหม่กว่า 5 ต้องเช็คว่า regex/pattern ยังครอบคลุม
 
 ---
+
+## LP-040: `ag/gemini-4-argon` เพิ่มไม่ได้ (404 `Requested entity was not found.`) ทั้งที่ `agy` CLI ใช้ Gemini 4 Argon ได้
+
+**Status:** ACTIVE · **Commit:** `9b61ee41` · **Implemented:** 2026-10-15 · **Upstream:** ยังไม่มี (v0.5.99 ไม่มี `argon` ใน registry เลย) → CASE A
+**Deploy:** ติดตั้งพร้อม v0.5.99 (2026-10-15 09:11) ยืนยัน live แล้ว
+
+**อาการ:** Add Model / chat ด้วย `ag/gemini-4-argon` ได้ HTTP 503 ← `[antigravity/gemini-4-argon] [404]: Requested entity was not found.` (+ `modelLock_*` 2 นาที)
+ขณะที่ `agy` (Antigravity CLI 1.3.5) บนเครื่องเดียวกันเลือก "Gemini 4 Argon (High)" ได้
+
+**Root cause — 2 ชั้น:**
+1. **ชื่อ:** id จริงคือ `gemini-4-argon-low` / `-medium` / `-high` (จาก `agy models`; ไม่มี `gemini-4-argon` เฉยๆ) และ 9Router ไม่มี row ใดใน registry
+2. **Google กั้นด้วย User-Agent:** ดัก header ของ `agy` ผ่าน proxy ในเครื่อง (`CLOUD_CODE_URL=http://127.0.0.1:<port> agy models`, token ถูก redact) → UA
+   `antigravity/cli/1.3.5 (aidev_client; os_type=darwin; arch=arm64; cl=998863838; auth_method=consumer)`, ไม่มี `X-Client-Name/Version`, `project: "aicode-consumers"`
+   ทดสอบทีละตัวแปรด้วย token ของ connection 9Router เอง (บัญชีเดียวกับ `agy` — เทียบอีเมลแล้ว):
+   - `fetchAvailableModels`: UA แบบ IDE (`antigravity/ide/2.11.0`) = 26 โมเดล ไม่มี Argon · UA แบบ CLI = 29 โมเดล มี Argon 3 ระดับ · เปลี่ยน `project` ไม่มีผล
+   - `generateContent` body แบบ 9Router: UA IDE → **404**, UA CLI → **200** `modelVersion=gemini-4-argon`; `thinkingConfig.thinkingLevel` high/low ใช้ได้ (high มี thought 138 token)
+
+**แก้:**
+- `open-sse/providers/shared.js`: `ANTIGRAVITY_CLI_USER_AGENT` (ค่าที่ดักได้) + `ANTIGRAVITY_CLI_ONLY_MODEL_PREFIXES = ["gemini-4-argon"]`
+- `AntigravityExecutor.buildHeaders(credentials, stream, _url, model, body)`: ถ้า `body.model || model` ขึ้นต้นด้วย prefix ในรายการ → UA แบบ CLI; โมเดลอื่นใช้ UA แบบ IDE เดิม
+  (ไม่เปลี่ยนทั้ง provider เพื่อไม่กระทบ quota bucket / พฤติกรรมของโมเดลที่ใช้อยู่) — `providerOverrides.headers` ของผู้ใช้ยังทับได้ตามเดิม
+- registry: `gemini-4-argon-{high,medium,low}` → upstream `gemini-4-argon-<tier>(<tier>)` (ระดับ thinking มาจาก suffix เหมือน 3.8) และ `gemini-4-argon` → `-medium(medium)` ตามแบบ `gemini-3.8-flash`
+- capabilities: pattern `*gemini-4-argon*` = gemini-level, ปิด thinking ไม่ได้, ctx 1,048,576 / out 65,536 (ค่าจาก `fetchAvailableModels`)
+- pricing: ตาม OpenRouter `google/gemini-4-argon` (2026-10-15) input 2.00 / output 10.00 / cache read 0.10 / reasoning 10.00, cache write 2.50 (1.25x input แบบ row Gemini อื่น)
+- **ไม่ได้ทำ:** รายการ quota ใน `open-sse/services/usage/google.js` (ใช้ UA แบบ IDE จึงไม่เห็น Argon อยู่ดี และทำงานเฉพาะ paid tier), MITM, เมนู CLI launcher
+
+**Test:** `tests/unit/antigravity-gemini-4-argon.test.js` 9 tests (registry, map tier→thinking, alias → medium, caps, ราคา, UA CLI เฉพาะ Argon, UA IDE คงเดิมสำหรับ 3.8)
+— เขียนก่อนแก้: แดง 8 (ตัวที่ 9 = guard UA IDE เขียวอยู่แล้ว) → เขียว 9/9 · full suite ไม่มี pass→fail (3,703 tests / 3,503 passed / 101 failed = แดงเดิม)
+
+**ความเสี่ยง / ⚠️ เช็คตอน upgrade:**
+- เป็นการแสดงตัวเป็น `agy` CLI (9Router แสดงตัวเป็น IDE อยู่แล้ว; registry ติด `deprecated` + `RISK_NOTICE` ของ Antigravity อยู่แล้ว)
+- UA มีเลข build `cl=998863838` ของ `agy` 1.3.5 — ถ้า Argon เริ่ม 404 อีก: ดักใหม่ด้วย `CLOUD_CODE_URL=… agy models` แล้วอัปเดต `ANTIGRAVITY_CLI_USER_AGENT`
+- ถ้า upstream เพิ่ม Argon เอง → เทียบว่าใช้ UA อะไรก่อนทิ้งแพตช์ (ถ้าใช้ UA แบบ IDE จะ 404 กับบัญชีนี้)
+- ถ้า Google เปิด Argon ให้ UA แบบ IDE แล้ว (ทดสอบ `fetchAvailableModels` ด้วย UA IDE เห็น Argon) → ถอด UA override เหลือแค่ registry/caps/ราคา
 
 ## Patch ที่ยังไม่ได้แก้ (รอตัดสินใจ)
 

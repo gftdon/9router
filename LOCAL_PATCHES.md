@@ -12,7 +12,7 @@
 | Build ที่ติดตั้ง global | `9router-0.5.99.tgz` จาก commit `9b61ee41` (v0.5.99 + LP-040; 15,663,725 bytes, SHA-256 `475fa91d154dc496c20035f5e6fd867939941f0ea17dac9574e66ee81a1553c3`) — ติดตั้ง 2026-10-15 09:11 · สำรองตัวเดิม (0.5.95) + SQLite (`.backup` แบบ online, integrity ok) + plist ที่ `/tmp/9router-before-v0599-20261015/` (0700/0600) |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-10-15 09:11:49 (launcher PID 56074, listener 56101); `server.log` กลับมาเขียนแล้ว (LP-034) · ก่อนหน้านี้ (10–15 ต.ค.) ตัวที่รันเป็น `9router` ที่เปิดเองจาก zsh ไม่มี `--log` — ปิด launcher ก่อนแล้วค่อยปิด server ตอนติดตั้ง |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
-| ค้างตรวจ | LP-020 `NEEDS_REVIEW` (v0.5.99) — probe non-stream บน `muse/…` แบบไม่มี `forceStream` ก่อนถอด · Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.99) |
+| ค้างตรวจ | muse ตอบ `chat.completion` ว่าง (`finish_reason: in_progress`) เป็นพักๆ ~3/30 ครั้ง — stream ของ Meta จบก่อน `response.completed` (ดู TODO ด้านล่าง) · Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.99) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
@@ -55,7 +55,7 @@
 | `f2d5bba4` | `open-sse/executors/muse.js`, `open-sse/executors/index.js` | LP-018: MuseExecutor ย้าย `reasoning_effort` → `reasoning.effort` บน /v1/responses | ACTIVE / KEPT (v0.5.99 — ซ้อนทับ `b00ba1aa` บางส่วน, idempotent) |
 | `d0da91c0` | `open-sse/executors/muse.js` | LP-013 (ขยาย): จำกัดความลึก tool schema ให้ provider `muse` ตรงด้วย | ACTIVE |
 | `db547565` | `open-sse/providers/thinkingLevels.js` | LP-019: ระดับ effort ของ muse-spark บน `muse` = minimal…max (เดิม max ถูกตัดเหลือ xhigh) | ACTIVE / KEPT (v0.5.99 — upstream clamp max→xhigh; ปรับเทส `muse-responses-wire`) |
-| `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | NEEDS_REVIEW (v0.5.99 — `b00ba1aa` น่าจะครอบแล้ว เทสผ่านโดยไม่มี forceStream แต่ยังไม่ยืนยัน live) |
+| `b528c903` | `open-sse/providers/registry/muse.js` | LP-020: `forceStream: true` ให้ muse — `stream:false` เคยได้ chat.completion ว่าง | UPSTREAM_FIXED / REMOVED (`06c1bbdb`, 2026-10-15) — upstream `b00ba1aa` (v0.5.99) พับ Responses SSE ให้ client non-stream เอง; A/B live กับ Meta ผลเท่ากันทุกแบบ |
 | `2735ef3a` | `open-sse/translator/formats/claude.js` | LP-021: ทิ้ง thinking block ที่ไม่มี signature ก่อนส่ง Claude (แก้ 400 `Invalid signature`) — ปรับจาก LP-003 | ACTIVE (deploy + ยืนยัน live แล้ว; ไม่ครอบคลุม signature ของ kimi → LP-022) |
 | `5c96c99e`, `4e8d2f28` | `open-sse/handlers/chatCore.js`, `open-sse/translator/formats/claude.js` | LP-022 (เดิม Bug E): Claude 400 `Invalid signature` → retry 1 ครั้งโดยตัด thinking ออก | ACTIVE (deploy + ยืนยัน live ทั้ง 2 commit) |
 | `0a8e550c` | `open-sse/utils/stream.js`, `open-sse/handlers/chatCore/streamingHandler.js` | LP-023: stream Claude→Claude (passthrough) ถอดชื่อ tool ที่ถูก cloak (`_ide`) กลับ | ACTIVE (deploy + ยืนยัน live แล้ว) |
@@ -102,7 +102,7 @@ Merge commit ของ fork: `3353e5fe` (ทำบน branch `upgrade/v0.5.99` �
 | **LP-017** — transport ตาม targetFormat | **MODIFIED (CASE C)** | `b00ba1aa` เลือก `modelTargetTransport` เมื่อ `supportedFormats` ไม่มี format ของ client = เคส muse เดิม probe ทุก provider × model × client format (**3,756** ชุด) ต่างจาก upstream เหลือ **2**: `xiaomi-tokenplan/mimo-v2.5-pro-claude` จาก client Responses/Gemini (ไม่มี transport ของ client, targetFormat `claude` ≠ default `openai` → upstream ส่ง body Claude ไป URL default) โค้ดไม่เปลี่ยน (fallback ทำงานเฉพาะเมื่อ `useTransport` เป็น null) ปรับ comment ให้ตรงขอบเขตใหม่ |
 | **LP-018** — `reasoning_effort` → `reasoning.effort` | KEPT (ซ้อนทับบางส่วน) | `b00ba1aa` ซ้อน effort ให้ muse ตอน `applyThinking` แล้ว ส่วนใน `MuseExecutor` ยัง idempotent และครอบ body ที่ไม่ผ่าน `applyThinking` (passthrough Responses) — executor ต้องคงไว้อยู่แล้วเพราะ LP-028/LP-036/LP-013 |
 | **LP-019** — muse-spark levels ถึง `max` | KEPT + ปรับเทส upstream | upstream ไม่มี row muse-spark จึง clamp `max`→`xhigh` และเทสใหม่ `muse-responses-wire` assert แบบนั้น — ขัดกับหลักฐาน LP-019 (Meta ตอบ `Supported values: [minimal … max]` + live 200 ด้วย `effort:"max"`) → เปลี่ยน assertion เป็น "keeps max" |
-| **LP-020** — `forceStream` ให้ muse | **NEEDS_REVIEW** | `b00ba1aa` ส่ง client non-stream บน upstream Responses เข้า `handleForcedSSEToJson` โดยไม่ต้อง `forceStream` ทดลองปิด `forceStream` → เทส muse/non-stream **37/37 ผ่าน** และ body ที่แปลงแล้วยังถูก pin `stream:true` → ดูเหมือน upstream ครอบแล้ว แต่ยังต่างที่ `stream` flag / `Accept` ที่ส่งให้ executor และ**ยังไม่ได้ยืนยัน live** จึงยังไม่ถอด — ถอดได้เมื่อ probe non-stream (client Claude + OpenAI) บน `muse/…` แบบไม่มี `forceStream` ผ่าน |
+| **LP-020** — `forceStream` ให้ muse | **UPSTREAM_FIXED → REMOVED** (`06c1bbdb`, 2026-10-15) | `b00ba1aa` ส่ง client non-stream บน upstream Responses เข้า `handleForcedSSEToJson` โดยไม่ต้อง `forceStream` — ตอนตรวจ merge (เทส 37/37 ผ่านเมื่อปิด) ยังไม่ได้ยืนยัน live จึงตั้ง NEEDS_REVIEW ไว้ก่อน; ยืนยัน live แล้วตามหัวข้อ LP-020 ด้านล่าง → ถอดออก |
 | LP-025 — Codex `strict` | **MODIFIED (CASE C)** | `0dd4d6be` เก็บ `strict` ที่ client ระบุมาแล้ว → delta เหลือบรรทัดเดียว: ไม่ระบุ → `false` (upstream ปล่อยว่าง ซึ่งคือเคสที่ทำให้ codex เติม optional ครบ) เทส upstream ปรับ assertion ตัวที่ 5 เป็น `false` |
 | LP-026 — placeholder `reason` | KEPT | `gemini.js` upstream ยัง `required: ["reason"]` (บรรทัด 415–432); `antigravity.js` upstream เพิ่มแค่ `parseError` |
 | LP-027 | KEPT | thinkingLevels upstream เปลี่ยนแค่ codebuddy-cn / minimax-code |
@@ -873,7 +873,7 @@ chat SSE tool call→tool_use); เทสที่เกี่ยวข้อง
 
 ## LP-017 / LP-018 / LP-019 / LP-020: combo `9-fast-worker` ใช้ `muse/muse-spark-1.3-contributor(max)` แล้ว HTTP 400 (provider `muse` ตรงของ Meta)
 
-**Status:** ACTIVE — v0.5.99: LP-017 MODIFIED, LP-018/LP-019 KEPT, LP-020 **NEEDS_REVIEW** (ดูหัวข้อ v0.5.99) · **Commits:** `010d2460` (LP-017), `f2d5bba4` (LP-018), `d0da91c0` (LP-013 ขยาย), `db547565` (LP-019), `b528c903` (LP-020), test `dc84b0ab` · **Implemented:** 2026-10-02
+**Status:** ACTIVE — v0.5.99: LP-017 MODIFIED, LP-018/LP-019 KEPT, LP-020 **UPSTREAM_FIXED → REMOVED** (`06c1bbdb`, 2026-10-15 — ดู "LP-020 ถอดออก" ด้านล่าง) · **Commits:** `010d2460` (LP-017), `f2d5bba4` (LP-018), `d0da91c0` (LP-013 ขยาย), `db547565` (LP-019), `b528c903` (LP-020), test `dc84b0ab` · **Implemented:** 2026-10-02
 **Upstream:** provider `muse` เพิ่งมาใน v0.5.95 (`28809807`); `upstream/master` = v0.5.95 ไม่มี commit แก้, ไม่มี issue ที่ตรง → CASE A
 
 **อาการ:** ใส่ `muse/muse-spark-1.3-contributor(max)` เป็นตัวแรกของ `9-fast-worker` แล้วทุก request ได้
@@ -917,6 +917,13 @@ opencode-go levels ไม่เปลี่ยน) — เทส URL แดง�
 - ถ้า upstream เพิ่ม levels ของ muse-spark → LP-019 เทียบกับค่าที่ Meta รับจริงก่อนทิ้ง
 - รัน `npx vitest run unit/muse-direct-responses.test.js` เป็น gate
 - ถ้า upstream ประกาศ `forceStream` ให้ muse หรือทำให้ non-stream path อ่าน Responses SSE ได้ → LP-020 = UPSTREAM_FIXED
+
+**LP-020 ถอดออก (2026-10-15, `06c1bbdb`):** A/B live กับ `api.meta.ai` ด้วย chatCore + `MuseExecutor` จริง (สลับ `PROVIDERS.muse.forceStream` ในหน่วยความจำ, DB ของเทสแยก)
+9 แบบ: client OpenAI (`stream:false` / ไม่ส่ง / `Accept: application/json` / `stream:true`), Claude (`stream:false` / `true` / tool call non-stream),
+Responses (`stream:false` / `true`) → เปิดกับปิดได้รูปแบบ + เนื้อหาเท่ากันทุกแบบ (tool call ได้ `tool_use get_weather` ทั้งคู่); ต่างแค่ `Accept: text/event-stream`
+ที่ไม่ส่งเมื่อปิด — Meta ยังตอบ SSE เพราะ translator ตั้ง `stream:true`; client Responses `stream:false` ได้ JSON ทั้งคู่ (ผ่าน LP-029 / non-stream handler)
+full suite เท่าเดิมทุก assertion (3,703 / 3,503 passed / 101 failed); เทส LP-020 ใน `muse-direct-responses` ยังเก็บไว้ (ตอนนี้ทดสอบเส้นทางของ upstream)
+**ข้อสังเกต:** ระหว่าง A/B มี `chat.completion` ว่าง (`finish_reason: in_progress`) 3 ใน ~30 ครั้ง เกิดทั้งเปิดและปิด `forceStream` → ไม่เกี่ยวกับ LP-020 (ดู TODO)
 
 **Install (2026-10-02):** สำรอง global + SQLite ที่ `/tmp/9router-before-lp017-20261002/` (0700/0600) → `npm run cli:pack` → `npm install --global ./9router-0.5.95.tgz`
 → ปิด launcher ก่อนแล้วค่อยปิด server (รอบก่อนๆ ที่ "terminal เปิดซ้ำเอง" เกิดจากปิด server ลูกก่อน แล้ว `tryRestart` ของ launcher ปลุกตัวใหม่)
@@ -1505,6 +1512,14 @@ Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router 
 
 **ตอนกลับมาทำ:** วัดใหม่ก่อน — `du -h ~/.9router/db/data.sqlite` และ `sqlite3 -readonly ~/.9router/db/data.sqlite "select name, sum(pgsize)/1048576.0 from dbstat group by name order by 2 desc limit 8;"`
 ความเร็วแท็บ Sessions ไม่ต้องห่วงแล้ว (คงที่ ~0.2 วิ ตามช่วง 30 วัน) — เรื่องนี้เป็นเรื่องพื้นที่ดิสก์อย่างเดียว
+
+### TODO: muse ตอบว่าง (`finish_reason: in_progress`) เป็นพักๆ — พบ 2026-10-15 ตอน A/B LP-020
+
+- client OpenAI non-stream บน `muse/muse-spark-1.3-contributor` ได้ HTTP 200 แต่ `content: ""` และ `finish_reason: "in_progress"` ประมาณ 3 ใน 30 ครั้ง (เกิดทั้งเปิด/ปิด `forceStream`)
+- stream ดิบจาก Meta ของครั้งที่ว่างสั้นผิดปกติ (2,559 byte เทียบกับปกติ 7–15k) และ**ไม่มี** `response.completed` — stream จบก่อนมี output
+- ผลกระทบ: client ได้คำตอบว่างแบบ "สำเร็จ" → combo/account fallback ไม่ทำงาน (ต่างจาก `event: error` / `response.failed` ที่ LP-031 แปลงเป็น 429/502 แล้ว)
+- แนวแก้ที่เป็นไปได้ (ยังไม่ทำ): ใน `streamToJsonConverter` ถ้า stream จบโดยไม่มี `response.completed` และไม่มี output เลย → คืน 502 ให้ fallback ทำงาน ต่อยอดจาก LP-031
+- ยังไม่รู้ว่า Meta ตัด stream เองหรือฝั่งเรา abort ก่อน — ต้องเก็บ log/timing เพิ่มก่อนสรุป
 
 ### TODO: muse `(max)` เงียบเกิน 5 นาที → `UND_ERR_BODY_TIMEOUT` → fast-worker ล้ม — รอทดสอบหลัง LP-036
 

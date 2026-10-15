@@ -12,7 +12,7 @@
 | Build ที่ติดตั้ง global | `9router-0.5.99.tgz` จาก commit `9b61ee41` (v0.5.99 + LP-040; 15,663,725 bytes, SHA-256 `475fa91d154dc496c20035f5e6fd867939941f0ea17dac9574e66ee81a1553c3`) — ติดตั้ง 2026-10-15 09:11 · สำรองตัวเดิม (0.5.95) + SQLite (`.backup` แบบ online, integrity ok) + plist ที่ `/tmp/9router-before-v0599-20261015/` (0700/0600) |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-10-15 09:11:49 (launcher PID 56074, listener 56101); `server.log` กลับมาเขียนแล้ว (LP-034) · ก่อนหน้านี้ (10–15 ต.ค.) ตัวที่รันเป็น `9router` ที่เปิดเองจาก zsh ไม่มี `--log` — ปิด launcher ก่อนแล้วค่อยปิด server ตอนติดตั้ง |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
-| ค้างตรวจ | muse ตอบ `chat.completion` ว่าง (`finish_reason: in_progress`) เป็นพักๆ ~3/30 ครั้ง — stream ของ Meta จบก่อน `response.completed` (ดู TODO ด้านล่าง) · Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.99) |
+| ค้างตรวจ | Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.99) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
@@ -25,6 +25,7 @@
 | `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `6c969135` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js`, `open-sse/translator/{concerns/finishReason.js,response/openai-responses.js,schema/*}`, `open-sse/utils/usageTracking.js` | LP-041: Responses upstream จบด้วย `response.incomplete` (`max_output_tokens` — muse เมื่อ reasoning ใช้ budget หมด) → เดิมได้ 200 ว่าง `finish_reason: "in_progress"` และไม่บันทึก usage · ตอนนี้ได้ `length` / `max_tokens` / `status: incomplete` + usage | ACTIVE (ยืนยัน live กับ Meta แล้ว) |
 | `9b61ee41` | `open-sse/executors/antigravity.js`, `open-sse/providers/{shared.js,registry/antigravity.js,capabilities.js,pricing.js}` | LP-040: Gemini 4 Argon บน Antigravity — Google ให้เฉพาะ User-Agent ของ `agy` CLI (UA แบบ IDE ได้ 404) → ส่ง UA แบบ CLI **เฉพาะ** `gemini-4-argon*` + ลงทะเบียน `ag/gemini-4-argon-{high,medium,low}` และ `ag/gemini-4-argon` (→ medium) + caps + ราคา | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-15 09:13) |
 | `3848a5e2` + `eb2ce4e5` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js`, `open-sse/providers/pricing.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget · ราคา Haiku 5.5 แบบ 2 ขั้นตามความยาว prompt ($0.10/$0.50 ≤100k, $0.50/$2.50 >100k; เดิมตก glob Haiku 4.5 แพง 10 เท่า) | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-08 09:33) |
 | `c9dedf5e` | `open-sse/utils/usageTracking.js` | LP-038: Kimi stream ส่ง `message_start` แบบไม่มี cache (input = prompt ทั้งก้อน) แล้วค่อยแยก cache ใน `message_delta` → max-merge นับ cache ซ้ำ (input ~2 เท่า, cache ดูเหลือ 50%) · ให้ delta ที่มี `input_tokens` ทับค่าฝั่ง prompt | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-05 15:39) |
@@ -923,7 +924,7 @@ opencode-go levels ไม่เปลี่ยน) — เทส URL แดง�
 Responses (`stream:false` / `true`) → เปิดกับปิดได้รูปแบบ + เนื้อหาเท่ากันทุกแบบ (tool call ได้ `tool_use get_weather` ทั้งคู่); ต่างแค่ `Accept: text/event-stream`
 ที่ไม่ส่งเมื่อปิด — Meta ยังตอบ SSE เพราะ translator ตั้ง `stream:true`; client Responses `stream:false` ได้ JSON ทั้งคู่ (ผ่าน LP-029 / non-stream handler)
 full suite เท่าเดิมทุก assertion (3,703 / 3,503 passed / 101 failed); เทส LP-020 ใน `muse-direct-responses` ยังเก็บไว้ (ตอนนี้ทดสอบเส้นทางของ upstream)
-**ข้อสังเกต:** ระหว่าง A/B มี `chat.completion` ว่าง (`finish_reason: in_progress`) 3 ใน ~30 ครั้ง เกิดทั้งเปิดและปิด `forceStream` → ไม่เกี่ยวกับ LP-020 (ดู TODO)
+**ข้อสังเกต:** ระหว่าง A/B มี `chat.completion` ว่าง (`finish_reason: in_progress`) 3 ใน ~30 ครั้ง เกิดทั้งเปิดและปิด `forceStream` → ไม่เกี่ยวกับ LP-020 — แก้แล้วเป็น LP-041 (`response.incomplete`)
 
 **Install (2026-10-02):** สำรอง global + SQLite ที่ `/tmp/9router-before-lp017-20261002/` (0700/0600) → `npm run cli:pack` → `npm install --global ./9router-0.5.95.tgz`
 → ปิด launcher ก่อนแล้วค่อยปิด server (รอบก่อนๆ ที่ "terminal เปิดซ้ำเอง" เกิดจากปิด server ลูกก่อน แล้ว `tryRestart` ของ launcher ปลุกตัวใหม่)
@@ -1491,6 +1492,48 @@ Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router 
 - ถ้า upstream เพิ่ม Argon เอง → เทียบว่าใช้ UA อะไรก่อนทิ้งแพตช์ (ถ้าใช้ UA แบบ IDE จะ 404 กับบัญชีนี้)
 - ถ้า Google เปิด Argon ให้ UA แบบ IDE แล้ว (ทดสอบ `fetchAvailableModels` ด้วย UA IDE เห็น Argon) → ถอด UA override เหลือแค่ registry/caps/ราคา
 
+## LP-041: muse ตอบ 200 แต่ว่าง (`finish_reason: "in_progress"`) เมื่อ reasoning ใช้ `max_output_tokens` หมด
+
+**Status:** ACTIVE · **Commit:** `6c969135` · **Implemented:** 2026-10-15 · **Upstream:** ยังไม่มี (v0.5.99 ไม่รู้จัก `response.incomplete` ที่ไหนเลย) → CASE A
+**Deploy:** ดูตารางสถานะด้านบน
+
+**อาการ:** `muse/muse-spark-1.3-contributor` client OpenAI non-stream ได้ HTTP 200, `content: ""`, `finish_reason: "in_progress"` เป็นพักๆ
+(พบตอน A/B LP-020 ~3/30) — client Claude ได้ `end_turn` ว่าง, client Responses ได้ `status: "in_progress"`, stream จบด้วย `stop` / `end_turn`
+และ**ไม่บันทึก usage** ของ request นั้น → combo/account fallback ไม่รู้ว่ามีปัญหา และยอด token หาย
+
+**Root cause:** stream ของ Meta **ไม่ได้ถูกตัด** (TODO เดิมเข้าใจผิด) — ยิงตรงไป `api.meta.ai` 30 ครั้งที่ `max_output_tokens: 400` ได้ 7 ครั้งที่จบด้วย
+`event: response.incomplete` + `incomplete_details.reason: "max_output_tokens"` (stream ครบ 5 event, 2,559 byte เท่ากันทุกครั้ง, usage output 400 = reasoning ทั้งหมด)
+คือ reasoning ใช้ budget หมดก่อนมี message — 9Router รู้จักแค่ `response.completed` / `response.done` จึงถือว่ายังไม่จบ:
+- `streamToJsonConverter` คง `status: "in_progress"` และทิ้ง usage → `sseToJsonHandler` เอา status ดิบไปเป็น `finish_reason`
+- translator `openai-responses` (stream) ไม่ปิด choice ด้วยเหตุผลจริง → `flush` เติม `stop`
+- `extractUsage` ไม่อ่าน usage จาก event นี้
+แนวคิดเดิมใน TODO "คืน 502" **ผิด** — เป็นการจบปกติแบบหมด budget ซึ่ง OpenAI/Anthropic มีคำตอบมาตรฐานอยู่แล้ว (`length` / `max_tokens`)
+
+**แก้:**
+- `schema/finishReasons.js`: `RESPONSES_INCOMPLETE` (`max_output_tokens`, `content_filter`) + re-export ใน `schema/index.js`
+- `concerns/finishReason.js` `toOpenAIFinish(reason, "openai-responses")`: `max_output_tokens` → `length`, `content_filter` → `content_filter`, อื่นๆ → `stop`
+- `transformer/streamToJsonConverter.js`: `response.incomplete` เป็น terminal → `status: "incomplete"` + เก็บ `incomplete_details` + usage
+- `handlers/chatCore/sseToJsonHandler.js`: status `incomplete` → `finish_reason` ผ่าน `toOpenAIFinish` (client Claude ได้ `max_tokens` ผ่านตัวแปลงเดิม; client Responses ได้ object `incomplete` ตรงๆ)
+- `translator/response/openai-responses.js`: `response.incomplete` ปิด stream แบบเดียวกับ `completed` แต่ใช้เหตุผลจาก `incomplete_details`
+- `utils/usageTracking.js` `extractUsage`: อ่าน usage จาก `response.incomplete` ด้วย
+- `responsesStreamHelpers.js` (ชุด terminal ของ stream ที่ไม่มี `[DONE]`) **ไม่ต้องแก้** — มีเทส guard ยืนยันว่าเขียวอยู่แล้ว
+
+**Test:** `tests/unit/responses-incomplete-terminal.test.js` 11 tests (fixture สังเคราะห์ตามรูป event จริงของ Meta, ไม่มี token/prompt_cache_key):
+client OpenAI/Claude/Responses × non-stream/stream + usage ถูกบันทึกทั้ง 4 แบบ + guard ไม่มี `[DONE]` — รันกับ source ก่อนแก้: แดง 9 / เขียว 2
+(passthrough ไป client Responses stream และ guard ไม่มี `[DONE]` — ทางนี้ส่ง event ดิบอยู่แล้ว) → หลังแก้เขียว 11/11
+· full suite เทียบรอบ LP-020: 3,714 tests / 3,514 passed / 101 failed, **0 pass→fail** · eslint ผ่าน
+
+**ยืนยัน live (2026-10-15, chatCore + `MuseExecutor` จริงกับ `api.meta.ai`, `max_tokens: 400`):**
+- รอบ 1 (20 ครั้ง ผสม OpenAI/Claude): ปกติ 16 · หมด budget 3 → `finish_reason: "length"` + `completion_tokens: 400` · 1 ครั้งได้ error result
+  (body ไม่มี `choices` = ทาง `createErrorResult` เท่านั้น ไม่ใช่ 200 ว่าง; ไม่ได้เก็บ status ไว้ — รอบ 2 ไม่เกิดซ้ำ)
+- รอบ 2 (24 ครั้ง OpenAI non-stream): ปกติ 19 · หมด budget 5 → `length` + usage ครบทุกครั้ง · ไม่มี `in_progress` เหลือเลย
+
+**ผลข้างเคียงที่ควรรู้:** client ที่ตั้ง `max_tokens` ต่ำกับ muse ยังได้ content ว่างได้ (Meta ไม่มี message ให้) แต่ตอนนี้ได้ `length` ตามมาตรฐาน
+→ client ที่ดี (Claude Code / SDK) จะรู้ว่าต้องเพิ่ม budget ไม่ใช่เข้าใจว่าโมเดลตอบว่าง; ถ้าต้องการให้ fallback ข้าม provider ในเคสนี้ เป็นเรื่องของนโยบาย combo ไม่ใช่ของแพตช์นี้
+
+**⚠️ เช็คตอน upgrade:** grep `response.incomplete` ใน `open-sse/` — ถ้า upstream จัดการเองทั้ง 4 จุด (converter, sseToJson, translator stream, extractUsage)
+→ รันเทสนี้บน upstream เปล่า ถ้าเขียว 11/11 = UPSTREAM_FIXED; ถ้าเขียวบางส่วน = CASE C เก็บเฉพาะจุดที่ยังแดง
+
 ## Patch ที่ยังไม่ได้แก้ (รอตัดสินใจ)
 
 ### TODO (ต่อจาก LP-032): ขนาด `usageHistory` โตไม่มีเพดาน — ทบทวนราว ม.ค.–ก.พ. 2027
@@ -1513,13 +1556,10 @@ Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router 
 **ตอนกลับมาทำ:** วัดใหม่ก่อน — `du -h ~/.9router/db/data.sqlite` และ `sqlite3 -readonly ~/.9router/db/data.sqlite "select name, sum(pgsize)/1048576.0 from dbstat group by name order by 2 desc limit 8;"`
 ความเร็วแท็บ Sessions ไม่ต้องห่วงแล้ว (คงที่ ~0.2 วิ ตามช่วง 30 วัน) — เรื่องนี้เป็นเรื่องพื้นที่ดิสก์อย่างเดียว
 
-### TODO: muse ตอบว่าง (`finish_reason: in_progress`) เป็นพักๆ — พบ 2026-10-15 ตอน A/B LP-020
+### ~~TODO: muse ตอบว่าง (`finish_reason: in_progress`) เป็นพักๆ~~ — ปิดแล้ว → LP-041 (`6c969135`, 2026-10-15)
 
-- client OpenAI non-stream บน `muse/muse-spark-1.3-contributor` ได้ HTTP 200 แต่ `content: ""` และ `finish_reason: "in_progress"` ประมาณ 3 ใน 30 ครั้ง (เกิดทั้งเปิด/ปิด `forceStream`)
-- stream ดิบจาก Meta ของครั้งที่ว่างสั้นผิดปกติ (2,559 byte เทียบกับปกติ 7–15k) และ**ไม่มี** `response.completed` — stream จบก่อนมี output
-- ผลกระทบ: client ได้คำตอบว่างแบบ "สำเร็จ" → combo/account fallback ไม่ทำงาน (ต่างจาก `event: error` / `response.failed` ที่ LP-031 แปลงเป็น 429/502 แล้ว)
-- แนวแก้ที่เป็นไปได้ (ยังไม่ทำ): ใน `streamToJsonConverter` ถ้า stream จบโดยไม่มี `response.completed` และไม่มี output เลย → คืน 502 ให้ fallback ทำงาน ต่อยอดจาก LP-031
-- ยังไม่รู้ว่า Meta ตัด stream เองหรือฝั่งเรา abort ก่อน — ต้องเก็บ log/timing เพิ่มก่อนสรุป
+- เดิมจดว่า "stream ของ Meta จบก่อน `response.completed`" และเสนอให้คืน 502 — **ทั้งสองข้อผิด**: stream ครบ แต่จบด้วย `response.incomplete`
+  (`max_output_tokens`) เพราะ reasoning ใช้ budget หมด → แก้เป็น `finish_reason: "length"` + บันทึก usage (ดู LP-041)
 
 ### TODO: muse `(max)` เงียบเกิน 5 นาที → `UND_ERR_BODY_TIMEOUT` → fast-worker ล้ม — รอทดสอบหลัง LP-036
 

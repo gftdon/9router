@@ -221,3 +221,32 @@ describe("Claude Code native combo thinking round-trip", () => {
     });
   });
 });
+
+// Upstream c8644368 drops blank thinking blocks on passthrough for gateways that
+// 400 them; Anthropic itself takes a signed blank block back (display omitted).
+describe("blank signed thinking on native passthrough (LP-003)", () => {
+  const history = () => ({
+    messages: [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: [
+        { type: "thinking", thinking: "", signature: "CAIS-opaque-fixture" },
+        { type: "thinking", thinking: "  ", signature: "" },
+        { type: "tool_use", id: "toolu_fixture", name: "Read", input: {} },
+      ] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_fixture", content: "ok" }] },
+    ],
+  });
+  const kinds = (out) => out.messages[1].content.map((b) => `${b.type}:${b.signature ?? ""}`);
+
+  it.each(["claude", "anthropic"])("keeps it when %s serves the request", async (provider) => {
+    const { normalizeClaudePassthrough } = await import("../../open-sse/translator/formats/claude.js");
+    expect(kinds(normalizeClaudePassthrough(history(), "claude-opus-5-5", provider)))
+      .toEqual(["thinking:CAIS-opaque-fixture", "tool_use:"]);
+  });
+
+  it("drops it for an anthropic-compatible gateway", async () => {
+    const { normalizeClaudePassthrough } = await import("../../open-sse/translator/formats/claude.js");
+    expect(kinds(normalizeClaudePassthrough(history(), "claude-opus-5-5", "anthropic-compatible-x")))
+      .toEqual(["tool_use:"]);
+  });
+});

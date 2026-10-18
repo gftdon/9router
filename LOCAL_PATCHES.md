@@ -3,31 +3,32 @@
 > เอกสารนี้บันทึก patch ที่เราแก้เองบน fork (`gftdon/9router`) แต่ยังไม่ได้ขึ้น upstream (`decolua/9router`)
 > **ทุกครั้งที่อัปเดต 9router เวอร์ชันใหม่ ให้เช็คไฟล์นี้ก่อน** — ถ้า patch ถูกเขียนทับ ให้ re-apply ตามขั้นตอนด้านล่างของแต่ละเคส
 
-## สถานะปัจจุบัน (อัปเดต 2026-10-15)
+## สถานะปัจจุบัน (อัปเดต 2026-10-19)
 
 | รายการ | ค่า |
 |---|---|
-| Upstream base | `v0.5.99` (`ce4460ef`, upstream ไม่มี tag) — merge `3353e5fe` (2026-10-15); รอบก่อน `v0.5.95` (`a99cf572`) merge `c3deacad` |
-| `origin/master` (`gftdon/9router`) | push ครบถึง LP-041 + ถอด LP-020 (2026-10-15, `34ad7467..b12aa41e` push ปกติ ไม่ force); รอบก่อน LP-040 + merge v0.5.99 (`838e9c13..34ad7467`) |
+| Upstream base | `v0.5.104` (`87a74e1b`, มี tag) — merge `c416e08f` (2026-10-19) + ถอด LP-016 `65cadf53` · **ยังไม่ deploy / ยังไม่ push** · รอบก่อน `v0.5.99` (`ce4460ef`, ไม่มี tag) merge `3353e5fe` |
+| `origin/master` (`gftdon/9router`) | = `e84319ab` (ยังไม่มีรอบ v0.5.104; ทำบน branch `upgrade/v0.5.104` แล้ว fast-forward `master` ในเครื่อง) · ก่อนหน้า push ครบถึง LP-041 + ถอด LP-020 (2026-10-15, `34ad7467..b12aa41e` push ปกติ ไม่ force); รอบก่อน LP-040 + merge v0.5.99 (`838e9c13..34ad7467`) |
 | Build ที่ติดตั้ง global | `9router-0.5.99.tgz` จาก commit `9bbaf320` (โค้ด = `6c969135`: v0.5.99 + LP-040 + ถอด LP-020 + LP-041; 15,663,927 bytes, SHA-256 `ea66f187fa56c4aae18a335a4c115c5579808c4b478c10b9ce902287bb531d17`) — ติดตั้ง 2026-10-15 10:30 · สำรอง build เดิม (`9b61ee41`) + SQLite (`.backup` แบบ online, integrity ok, 250,393 แถว `usageHistory`) + plist ที่ `/tmp/9router-before-lp041-20261015/` (0700/0600) · รอบก่อน (09:11, 0.5.95 → `9b61ee41`) สำรองที่ `/tmp/9router-before-v0599-20261015/` |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-10-15 10:30:37 (launcher PID 29035, listener 29053; KeepAlive=false จึงหยุด launcher → server แล้วติดตั้งได้โดยไม่เกิดใหม่เอง); `server.log` กลับมาเขียนแล้ว (LP-034) · ก่อนหน้านี้ (10–15 ต.ค.) ตัวที่รันเป็น `9router` ที่เปิดเองจาก zsh ไม่มี `--log` — ปิด launcher ก่อนแล้วค่อยปิด server ตอนติดตั้ง |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
-| ค้างตรวจ | Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.99) |
+| ค้างตรวจ | Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.104 / v0.5.99) |
+| ⚠️ ต้องทำเอง | **`cc/` (Claude Account 2) ใช้ไม่ได้ตั้งแต่ 2026-10-17 21:37 (เวลาไทย)** — refresh token หมดอายุ (`invalid_grant: Refresh token expired`, ทุก request ได้ 401→503) → login ใหม่ใน Dashboard › Providers › Claude (ไม่เกี่ยวกับการอัปเกรด พบตอนจะ probe 2026-10-19) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
 
 | Commit | ไฟล์ที่แก้ | แก้อะไร | สถานะ |
 |---|---|---|---|
-| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / KEPT (v0.5.99 — upstream แก้ pattern GLM เป็น 1M แล้ว แต่ยังไม่ strip suffix: 34/53 model ต่าง) |
+| `b55f405e` | `open-sse/providers/capabilities.js` | Patch 1: เหลือเฉพาะ strip effort suffix; ใช้ GLM-5.2 limits จาก upstream | ACTIVE / KEPT (v0.5.104 — upstream ยังไม่ strip suffix; v0.5.99: 34/53 model ต่าง) |
 | `0bb6cc65` | `src/sse/services/model.js` | Patch 2: strip `[1m]` suffix ตอน resolve combo name | ACTIVE / REDUNDANT-สำหรับ chat path (v0.5.99) |
 | `c31f4070` | `open-sse/translator/formats/gemini.js` | LP-006: strip schema annotations โดยรักษาชื่อ property จริง (เพิ่มทะเบียนย้อนหลัง) | ACTIVE / KEPT (v0.5.95) |
-| `b35cdcac` | `open-sse/translator/formats/claude.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.95) |
+| `b35cdcac` (+ ปรับใน merge `c416e08f`) | `open-sse/translator/formats/claude.js`, `open-sse/handlers/chatCore.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / MODIFIED (v0.5.104 — upstream `c8644368` ทิ้ง thinking ว่างบน passthrough; คง block ที่มี signature เมื่อปลายทางเป็น `claude`/`anthropic`) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
 | `6c969135` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js`, `open-sse/translator/{concerns/finishReason.js,response/openai-responses.js,schema/*}`, `open-sse/utils/usageTracking.js` | LP-041: Responses upstream จบด้วย `response.incomplete` (`max_output_tokens` — muse เมื่อ reasoning ใช้ budget หมด) → เดิมได้ 200 ว่าง `finish_reason: "in_progress"` และไม่บันทึก usage · ตอนนี้ได้ `length` / `max_tokens` / `status: incomplete` + usage | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-15 10:35) |
-| `9b61ee41` | `open-sse/executors/antigravity.js`, `open-sse/providers/{shared.js,registry/antigravity.js,capabilities.js,pricing.js}` | LP-040: Gemini 4 Argon บน Antigravity — Google ให้เฉพาะ User-Agent ของ `agy` CLI (UA แบบ IDE ได้ 404) → ส่ง UA แบบ CLI **เฉพาะ** `gemini-4-argon*` + ลงทะเบียน `ag/gemini-4-argon-{high,medium,low}` และ `ag/gemini-4-argon` (→ medium) + caps + ราคา | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-15 09:13) |
-| `3848a5e2` + `eb2ce4e5` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js`, `open-sse/providers/pricing.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget · ราคา Haiku 5.5 แบบ 2 ขั้นตามความยาว prompt ($0.10/$0.50 ≤100k, $0.50/$2.50 >100k; เดิมตก glob Haiku 4.5 แพง 10 เท่า) | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-08 09:33) |
+| `9b61ee41` | `open-sse/executors/antigravity.js`, `open-sse/providers/{shared.js,registry/antigravity.js,capabilities.js,pricing.js}` | LP-040: Gemini 4 Argon บน Antigravity — Google ให้เฉพาะ User-Agent ของ `agy` CLI (UA แบบ IDE ได้ 404) → ส่ง UA แบบ CLI **เฉพาะ** `gemini-4-argon*` + ลงทะเบียน `ag/gemini-4-argon-{high,medium,low}` และ `ag/gemini-4-argon` (→ medium) + caps + ราคา | ACTIVE / MODIFIED (v0.5.104 — upstream `29fc880e` ลง `ag/gemini-4-argon-high` + `*gemini-4*` caps แต่ยังใช้ UA แบบ IDE 2.22.0 ซึ่ง probe live ยัง 404 → เหลือ UA CLI + medium/low/alias + ราคา; ทิ้ง caps row ของเอง) · deploy v0.5.99 2026-10-15 09:13 |
+| `3848a5e2` + `eb2ce4e5` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js`, `open-sse/providers/pricing.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget · ราคา Haiku 5.5 แบบ 2 ขั้นตามความยาว prompt ($0.10/$0.50 ≤100k, $0.50/$2.50 >100k; เดิมตก glob Haiku 4.5 แพง 10 เท่า) | ACTIVE / KEPT (v0.5.104 — upstream `f5f88039` เพิ่ม `*claude*haiku-5*` เป็น budget: resolve คง adaptive + `pdf`; ปรับเทส upstream 2 ไฟล์) · deploy 2026-10-08 09:33 |
 | `c9dedf5e` | `open-sse/utils/usageTracking.js` | LP-038: Kimi stream ส่ง `message_start` แบบไม่มี cache (input = prompt ทั้งก้อน) แล้วค่อยแยก cache ใน `message_delta` → max-merge นับ cache ซ้ำ (input ~2 เท่า, cache ดูเหลือ 50%) · ให้ delta ที่มี `input_tokens` ทับค่าฝั่ง prompt | ACTIVE (deploy + ยืนยัน live แล้ว 2026-10-05 15:39) |
 | `1271470a` | `open-sse/translator/concerns/passthroughThinking.js` (ใหม่), `open-sse/handlers/chatCore.js`, `thinkingUnified.js` (export `resolveFormat`) | LP-037: ใช้ effort จาก suffix ของ combo (`model(high)`) กับ request แบบ passthrough ด้วย — เดิมถูกตัดทิ้ง ส่งค่า thinking ของ client ไปแทน | ACTIVE / KEPT (v0.5.99 — Opus 5.5 เป็น always-thinking ตาม upstream `a07ed95b`: ส่ง effort อย่างเดียว; ปรับเทส) |
 | `26267bb5` | `open-sse/executors/muse.js` | LP-036: ส่ง `prompt_cache_key` (จาก session ของ client) ให้ Muse — เดิม cache หลุด 0% เกือบครึ่งของ request | ACTIVE |
@@ -50,7 +51,7 @@
 | `ba910b94`, `d0da91c0` | `open-sse/utils/museSparkToolSchema.js`, `open-sse/executors/{opencode,opencode-go,opencode-zen,muse}.js` | LP-013: จำกัดความลึก tool schema ≤10 ชั้น เฉพาะ Muse Spark | ACTIVE / KEPT (v0.5.95) |
 | `7fd7ee12`, `d48c12c8` | `open-sse/providers/registry/codex.js`, `open-sse/providers/pricing.js` | LP-014: bump Codex CLI identity → 0.159.0 + เพิ่ม gpt-6.1-sol | UPSTREAM_FIXED (`ca6e8407`, `dec820b9`, v0.5.95) |
 | `c85dc41e` | `open-sse/config/grokCli.js` (+7 ไฟล์) | LP-015: backport upstream `6b9dc54d` — Grok CLI identity 0.2.99 → 1.0.44 (แก้ HTTP 426) | UPSTREAM_FIXED (`6b9dc54d` อยู่ใน v0.5.95 แล้ว) |
-| `8f7c6cde` | `open-sse/handlers/chatCore/{sseToJsonHandler,nonStreamingHandler,claudeMessageBody}.js` | LP-016 (เดิม Bug C): `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน Anthropic `message` แทน chat.completion | ACTIVE / KEPT (v0.5.95) |
+| `8f7c6cde` | `open-sse/handlers/chatCore/{sseToJsonHandler,nonStreamingHandler,claudeMessageBody}.js` | LP-016 (เดิม Bug C): `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน Anthropic `message` แทน chat.completion | UPSTREAM_FIXED / REMOVED (`65cadf53`, 2026-10-19) — upstream `1d4335d4` (v0.5.104) ตัวแปลงเดียวกันที่ `translator/concerns/claudeMessage.js` + เรียกทั้ง 2 เส้น; เทส LP-016 เขียวบนโค้ด upstream |
 
 | `010d2460` | `open-sse/handlers/chatCore.js` | LP-017: เลือก transport ตาม targetFormat ของ model เมื่อไม่มี transport ตรงกับ client (muse ยิงผิด URL → 400 `unknown parameter input`) | ACTIVE / MODIFIED (v0.5.99 — upstream `b00ba1aa` แก้เคส muse แล้ว เหลือ client ที่ไม่มี transport เช่น xiaomi-tokenplan mimo-v2.5-pro-claude) |
 | `f2d5bba4` | `open-sse/executors/muse.js`, `open-sse/executors/index.js` | LP-018: MuseExecutor ย้าย `reasoning_effort` → `reasoning.effort` บน /v1/responses | ACTIVE / KEPT (v0.5.99 — ซ้อนทับ `b00ba1aa` บางส่วน, idempotent) |
@@ -64,6 +65,80 @@
 | `35f6bbe9` | `open-sse/executors/codex.js` | LP-025: ส่ง `strict:false` ให้ function tool ของ Codex เมื่อ client ไม่ได้ระบุ (กัน codex ใส่ optional argument ครบทุกตัว) | ACTIVE / MODIFIED (v0.5.99 — upstream `0dd4d6be` เก็บ strict ที่ระบุมา; เหลือ default `false`) |
 
 > ทั้ง 2 patch แรกแก้ **Bug B (autocompact thrash)** ร่วมกัน — Patch 1 แก้ caps ผิด, Patch 2 ทำให้ client ขอ 1M window ผ่าน combo ได้จริง
+
+## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.104 — 2026-10-19
+
+Upstream: tag `v0.5.104` = `87a74e1b` "# v0.5.104 (2026-10-15)" (37 commits, 140 files เทียบกับ `ce4460ef` v0.5.99) — รอบนี้ upstream สร้าง tag แล้ว
+Merge commit ของ fork: `c416e08f` (ทำบน branch `upgrade/v0.5.104` แล้ว fast-forward `master`) + `65cadf53` ถอด LP-016 — merge ตามแบบรอบก่อน ไม่ rebase
+ตรวจ implementation จริงของ upstream ทุกตัว + probe live (UA ของ Argon) + หลักฐานจาก `usageHistory`/transcript (thinking ว่าง) ไม่ได้ตัดสินจาก changelog/ชื่อ commit
+
+### ไฟล์ที่ upstream แตะทับแพตช์ (18 ไฟล์ที่ทั้งสองฝั่งแก้ ไม่นับ `CHANGELOG.md`)
+
+| ไฟล์ | upstream commit ใน v0.5.99..v0.5.104 | ผลต่อแพตช์ |
+|---|---|---|
+| `open-sse/providers/registry/antigravity.js` | `29fc880e` (ลง `gemini-4-argon-high`) | **conflict** — LP-040 (row `-high` เหมือนกันทุกตัวอักษร) |
+| `open-sse/providers/capabilities.js` | `f5f88039` (`pdf: true` + row `*claude*haiku-5*` แบบ budget), `29fc880e` (`*gemini-4*`), `c8644368` (opencode-go haiku-5-5) | **conflict ×2** — LP-039, LP-040 |
+| `open-sse/handlers/chatCore/nonStreamingHandler.js`, `sseToJsonHandler.js` | `1d4335d4` (ย้ายตัวแปลง Claude ไป `translator/concerns/claudeMessage.js` + เรียกในเส้น forced-SSE ทั้ง 2) | **conflict** (import) + import ชื่อซ้ำ/เรียกซ้ำใน `sseToJsonHandler` — LP-016 (ตรงกันทั้งตัว), import ของ LP-026 |
+| `open-sse/executors/opencode-zen.js` | `59e9b526` (free-tier identity บน keyed lane), `ef4679df` | **conflict** (import) — LP-013 |
+| `open-sse/translator/formats/claude.js` | `c8644368` (ทิ้ง thinking ว่าง ทั้ง passthrough และ `prepareClaudeRequest`; ตัด `context_management` ให้ provider ที่ไม่ใช่ Anthropic) | auto-merge แต่ **ขัด LP-003** (เทส LP-003 แดง 10) |
+| `tests/unit/capabilities.test.js`, `opencode-go-claude-haiku-55-thinking.test.js` | `c8644368` / `f5f88039` | auto-merge แต่ **assertion ขัด LP-039** (haiku-5-5 นอก opencode-go = budget) |
+| `open-sse/executors/antigravity.js` | `eb373017` (`normalizeGeminiContents(…, model)`) | auto-merge คนละบรรทัดกับ LP-026 / LP-040 |
+| `open-sse/providers/shared.js` | `cff2b1d9` (UA IDE 2.11.0 → 2.22.0) | auto-merge — ค่าคงที่ของ LP-040 อยู่ถัดไป |
+| `open-sse/executors/default.js` | `90f89471` (Nous attribution tags) | auto-merge คนละบล็อกกับ LP-004 |
+| `open-sse/executors/opencode.js` | `5bdcd5e7` (free tier → `/inference/v1`), `ef4679df`, `e964e482` | auto-merge — LP-013 (`capToolSchemasDepth`) อยู่ครบ |
+| `open-sse/handlers/chatCore.js` | `db81a8c9` (ข้อความ headroom), `cfd8c618` (`proxyPoolId`/`strictProxy`) | auto-merge — LP-017/022/029/030/032/037 ครบ |
+| `open-sse/providers/thinkingLevels.js`, `translator/concerns/thinkingUnified.js` | `29fc880e` (gemini-4 = low/medium/high + clamp `minimal`), `165f9b90` (nous) | auto-merge — LP-019/027/037 ครบ (`resolveFormat` ยัง export) |
+| `open-sse/translator/formats/gemini.js` | `eb373017` (Gemini 4: functionResponse ไว้ท้าย) | auto-merge — LP-006 (`isPropertyMap`) / LP-026 ครบ |
+| `src/lib/db/repos/usageRepo.js` | `813a0121` (token fallback, mask key แบบ trim) | auto-merge คนละบล็อกกับ LP-010 / LP-032 |
+| `tests/unit/codex-*.test.js`, `tests/translator/thinking-unified.test.js`, `providers-baseline.json` | `7878f53b` (gpt-5.5 → gpt-5.6-terra), `4c58e7f3`, `cff2b1d9` | auto-merge |
+
+### ผลประเมินรายแพตช์
+
+| Patch | ผล | หลักฐานที่ตรวจจริงใน v0.5.104 |
+|---|---|---|
+| Patch 1 — strip effort suffix ใน capabilities | KEPT | `capabilities.js` upstream ยังไม่ strip suffix (`replace(/\(` 0 hit) |
+| Patch 2 — Combo `[1m]` | REDUNDANT สำหรับ chat path (คงเดิม) | `src/sse/services/model.js` ไม่ถูกแตะ |
+| **LP-003** — native thinking blocks | **MODIFIED (CASE C)** | `c8644368` ทิ้ง thinking ที่ข้อความว่างใน `normalizeClaudePassthrough` (อ้างว่า Anthropic ตอบ 400 "each thinking block must contain non-whitespace thinking") แต่ **Anthropic รับ block ว่างที่มี signature**: Opus 5.5 / Fable 5.1 ตอบ thinking `""` + signature (display omitted) — transcript ล่าสุด 60 ไฟล์มี 15,741/19,843 block แบบนี้, session `3c3adff9` (2026-10-17) ผ่าน 9Router → `claude-opus-5-5(high)` **372/372 ok** ทั้งที่ส่ง block แบบนี้ 280 อัน, log ไม่มีข้อความ `non-whitespace thinking` เลย · ถ้าทิ้ง จะเสีย thinking ที่ต้องนำ turn `tool_use` ที่ยังเปิดอยู่ → resolve: `normalizeClaudePassthrough(body, model, provider)` คง block ว่างที่**มี signature** เมื่อ provider = `claude`/`anthropic`; ปลายทางอื่น (`anthropic-compatible-*`) ยังทิ้งตาม upstream · เทส upstream `claude-empty-thinking-block` (ไม่ส่ง provider) ผ่านครบ · เพิ่มเทส 3 ข้อใน `claude-native-thinking` — ไม่มีการปรับ = แดง 12/18, มี = 18/18 |
+| LP-004 — native client version | KEPT | `default.js` upstream เพิ่มแค่ `applyNousAttribution`; บล็อก `clientUserAgent` อยู่ครบ |
+| LP-006 — Gemini schema annotations | KEPT | `eb373017` แก้ลำดับ functionResponse คนละเรื่อง; `isPropertyMap` upstream 0 hit |
+| LP-008 / LP-009 / LP-010 / LP-011 / LP-012 | KEPT | `pricing.js`, `tests/vitest.config.js`, script backfill ไม่ถูกแตะ |
+| LP-013 — Muse Spark tool depth | KEPT | conflict import ใน `opencode-zen.js` (รวม 2 import); `capToolSchemasDepth` ครบทั้ง opencode / opencode-go / opencode-zen / muse |
+| **LP-016** — Claude body บนเส้น forced-SSE | **UPSTREAM_FIXED → REMOVED** (`65cadf53`) | `1d4335d4` = ตัวแปลงเดียวกัน (`translator/concerns/claudeMessage.js`, ใช้ schema constant) + เรียกทั้งกิ่ง Responses SSE และ Chat SSE เหมือนแพตช์ · merge ใช้ import ของ upstream แล้ว `65cadf53` ลบการเรียกซ้ำ (no-op รอบสอง) และ `claudeMessageBody.js` · เทส `claude-forced-sse-nonstream` (ของ LP-016) **เขียวบนโค้ด upstream** |
+| LP-017 / LP-029 / LP-030 | KEPT | `chatCore.js` upstream เปลี่ยนแค่ข้อความ headroom + proxy options |
+| LP-018 / LP-019 / LP-027 / LP-028 / LP-036 | KEPT | `muse.js` ไม่ถูกแตะ; upstream ยังไม่มี row muse-spark ใน thinkingLevels |
+| LP-021 / LP-022 | KEPT | `c8644368` ไม่แตะ `isUnsignedThinking` / `stripThinkingForSignatureRetry`; บล็อก retry ใน `chatCore.js` ครบ |
+| LP-023 / LP-024 / LP-031 / LP-033 / LP-035 / LP-038 | KEPT | ไฟล์ของแพตช์ไม่ถูกแตะ (`stream.js`, `streamingHandler`, `streamToJsonConverter`, `streamHandler`, `usage/page.js`, `usageTracking.js`) · LP-024 เรียกตัวแปลงของ upstream แทน (พฤติกรรมเท่าเดิม) |
+| LP-025 — Codex `strict` | KEPT | `codex.js` ไม่ถูกแตะ (upstream ยังปล่อย strict ว่างเมื่อ client ไม่ระบุ) |
+| LP-026 — placeholder `reason` | KEPT | `gemini.js` upstream ยัง `required = ["reason"]` (บรรทัด 421, 433) |
+| LP-032 — Sessions | KEPT | `schema.js` ไม่ถูกแตะ, `SCHEMA_VERSION` = 2 ทั้งสองฝั่ง (per-key token quota `2aa9307f` ถูก revert ใน `6ed88685` ก่อนออก tag) |
+| LP-034 | KEPT (นอก repo) | — |
+| LP-037 | KEPT | `passthroughThinking.js` ไม่ถูกแตะ; call ใน `chatCore.js` ครบ |
+| **LP-039** — Haiku 5.x adaptive | KEPT (resolve conflict + ปรับเทส upstream) | `f5f88039` เพิ่ม `*claude*haiku-5*` เป็น **budget** และเทสของ `c8644368` คาดว่า haiku-5-5 นอก opencode-go เป็น budget — แต่ comment ของ upstream เองยืนยันว่า Haiku 5.5 ตอบ 400 กับ `thinking.type.enabled` (บน OpenCode Go) และ LP-039 probe Anthropic ตรงแล้ว (2026-10-08) · resolve: row เป็น `claude-adaptive` + `pdf: true` ของ upstream; regex `ADAPTIVE_THINKING_UNSUPPORTED` upstream ยัง `/haiku/i`; ราคา haiku-5 upstream 0 hit · เทส 2 ไฟล์ย้าย guard budget ไปที่ Haiku 4.5 |
+| **LP-040** — Gemini 4 Argon บน Antigravity | **MODIFIED (CASE C)** | `29fc880e` ลง `ag/gemini-4-argon-high` + caps `*gemini-4*` (ค่าเท่ากับของ LP-040 ทุกช่อง) + levels low/medium/high + clamp `minimal`; `cff2b1d9` bump UA IDE เป็น 2.22.0 · **probe live 2026-10-19 (token ของ connection, ไม่พิมพ์):** `fetchAvailableModels` UA IDE 2.11.0 = 26 โมเดล, IDE 2.22.0 = 26 โมเดล (ไม่มี Argon ทั้งคู่), UA CLI 1.3.5 = 29 (มี Argon 3 ระดับ) · `generateContent gemini-4-argon-high`: IDE 2.11.0/2.22.0 → **404**, CLI → **200** `modelVersion=gemini-4-argon` → คง UA CLI + `-medium`/`-low`/alias + ราคา (upstream ไม่มีราคา Argon); ทิ้ง caps row `*gemini-4-argon*` ใช้ของ upstream |
+| LP-041 — `response.incomplete` | KEPT | upstream `response.incomplete` 0 hit · ⚠️ upstream `8f4e3800` (combo fallback เมื่อ 200 แต่ไม่มีเนื้อหา) ถือ `length`/`max_tokens` เป็นการจบปกติ → คำตอบที่ LP-041 แปลงแล้ว**ไม่**ทำให้ combo ข้ามไปโมเดลถัดไป (ก่อน LP-041 status `in_progress` จะทำให้ข้าม) — สอดคล้องกับเจตนาเดิมของ LP-041 ที่ให้ client เห็น `length` |
+
+### ข้อสังเกตที่ไม่ได้แก้ (นอกขอบเขต upgrade)
+
+- `prepareClaudeRequest` (เส้นแปลง format เช่น client OpenAI → `cc/`): `c8644368` เพิ่ม `if (!String(block.thinking ?? "").trim()) continue;` ให้ทั้ง `thinking` **และ `redacted_thinking`** — `redacted_thinking` ไม่มีฟิลด์ `thinking` จึงถูกทิ้งเสมอ และ block ว่างที่ signed ก็ถูกทิ้ง · LP-003 ไม่ครอบเส้นนี้ (passthrough เท่านั้น) และเส้นนี้ก็ทิ้ง signature ที่ไม่ผ่าน `isValidClaudeSignature` อยู่แล้ว จึงไม่แก้ในรอบนี้ — ถ้าเจอ 400 "must start with a thinking block" จาก client ที่ไม่ใช่ Claude Code ให้ดูจุดนี้ก่อน
+- Codex image: `7878f53b` เปลี่ยน `CODEX_IMAGES_MAIN_MODEL` `gpt-5.5` → `gpt-5.6-sol` = ต้นเหตุที่ `cx/gpt-image-2.5` / `cx/gpt-5.5-image` ตอบ 400 ทุกครั้ง (ข้อเสนอ LP-042 เดิม) → **ไม่ต้องทำ LP-042 ส่วนนี้แล้ว** (ต้องยืนยัน live หลัง deploy) · ที่ยังเหลือ: `gpt-6.1-sol-image` ไม่มีใน registry (ผู้ใช้เพิ่มเป็น custom model) และไม่มีราคา (cost = $0)
+- `cc/` (Claude Account 2) refresh token หมดอายุตั้งแต่ 2026-10-17 → ต้อง login ใหม่ (ดูตารางสถานะ) — ทำให้ probe เส้น `cc/` live ไม่ได้ในรอบนี้
+
+### Validation (2026-10-19)
+
+- **Full suite (เทียบราย assertion กับ master ก่อน merge = ผลรอบ LP-041):** master 3,714 tests / 101 failed → HEAD `65cadf53` **3,927 tests / 3,739 passed / 89 failed, pass→fail 0, เทสใหม่แดง 0** (fail→pass 10 จาก upstream; 23 เทสถูก upstream ลบ/เปลี่ยนชื่อ เช่น gpt-5.5, opencode fingerprint)
+- **ระหว่างทาง (ก่อนแก้):** merge ดิบมี pass→fail 10 (LP-003 ทั้งหมด) + เทสใหม่แดง 3 (LP-039) — แก้ตามตารางด้านบน · `golden-url-header` minimax-code แดงเฉพาะรอบที่ 2 ขึ้นไปเหมือน v0.5.99 (snapshot ที่ vitest เขียนมี `randomUUID`; ลบ snapshot แล้วรัน = 150/150; ไม่ได้ commit)
+- **Patch regression tests:** 25 ไฟล์ 310 tests → 307 ผ่าน; แดง 3 = ของเดิมบน master ทั้งหมด (`thinking-unified` GLM-5.2 reasoning_effort, `codex-gpt6-lite` gpt-6.1-sol caps, `translator-helpers-edge` haiku hoist)
+- **Baselines:** `verify-providers` (94 providers byte-for-byte) / `verify-alias` / `verify-oauth-urls` **เท่ากับ upstream v0.5.104 เปล่า** (worktree แยก)
+- **ESLint:** ไฟล์ที่ resolve/แก้ ผ่าน (warning เดิม `import/no-anonymous-default-export` ใน registry) · `git diff --check` ผ่าน · **Build:** `npm run build` ผ่าน (รวม standalone assets)
+- **Versions:** root + CLI = **0.5.104** (merge พามา); upstream ไม่เพิ่ม dependency
+
+### Security notes ของ upstream v0.5.104 (ตรวจโดย deep-reasoner, read-only; spot-check บรรทัดหลักแล้ว)
+
+- **ไม่มี HIGH** — Nous OAuth (`165f9b90`) เป็น device-code flow host hardcode, token ไม่ถูกคืน/ log · OpenCode free tier แค่**แทน** key `oc_sk_*` ด้วย `Bearer public` ไม่เปลี่ยนปลายทาง · `/v1/models` เพิ่มแค่ id คงที่หลัง gate เดิม · prune custom model ใช้ `LIKE` แบบ parameter · Cursor DashboardService / auto-ping schedule ใช้ URL คงที่ ไม่มี SSRF
+- **MEDIUM — Cursor AgentService ข้าม strict proxy:** `open-sse/executors/cursor.js:267` (`if (proxyOptions?.vercelRelayUrl) return false;`) ทำให้ pool แบบ relay ที่ strict ไม่ fail-closed → `http2.connect` ตรง (IP จริงหลุด); ChatService h2 (`:1033-1035`) ไม่ดู `strictProxy`; `proxyFetch.js:355-371` bypass host ก่อน guard strict · **เครื่องนี้ไม่โดน:** ไม่มี connection `cursor` และ `proxyPools` = 0 แถว
+- **MEDIUM (เฉพาะ `requireLogin=false`) — Hermes:** STT ใหม่ (`d6431f8b`) เขียน `audio.model` / `baseUrl` ลง YAML โดยไม่ escape (`hermesYaml.js:200,238-239`), ใช้ข้อความผู้ใช้เป็น replacement ของ `String.replace` (`$&`/`$'` ขยายได้, `:205,221,225,241`); ของเดิม (role RegExp `:22`, CR/LF ใน `.env` `:117-121`) ยังไม่แก้ — POST ข้ามไซต์ชี้ `stt.openai.base_url` ไปเครื่องอื่นได้ (เสียง + `OPENAI_API_KEY` หลุด) · **เครื่องนี้ไม่โดน:** `requireLogin` ไม่ได้ตั้ง = ค่า default `true` (`settingsRepo.js:26`)
+- **LOW:** `/api/usage/stats` / `/api/usage/stream` ใช้ API key เต็มเป็น key ของ object `byApiKey` (`usageRepo.js:662`, rollup `:525/:534`) — `apiKeyMasked` จึงไม่ได้ปิดอะไร (ต้องผ่าน dashboard auth) · auto-ping (`quotaAutoPing.js:102-110`) hardcode `strictProxy:false` · token refresh (`chatCore.js:461`) ไม่ส่ง `proxyOptions` (น่าจะเก่ากว่ารอบนี้)
+- ไม่ได้แก้ในรอบนี้ (นอกขอบเขต upgrade) — ผู้สมัครเป็น LP แยก: (1) Cursor fail-closed (ลบ `:267` + `proxyIntentFailed` ใน `execute()`) (2) Hermes validate model/URL/role + function replacement + ปฏิเสธ CR/LF + ตรวจ Origin ที่ `/api/cli-tools` POST (3) key bucket ของ usage stats เป็น hash/id
 
 ## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.99 — 2026-10-15
 
@@ -512,6 +587,8 @@ grep -q 's\*1m' ~/.local/lib/node_modules/9router/app/.next-cli-build/server/chu
 
 **Status:** ACTIVE · **Commit:** `b35cdcac` · **Date:** 2026-09-21
 
+**v0.5.104 audit:** MODIFIED — upstream `c8644368` ทิ้ง thinking ที่ข้อความว่างใน `normalizeClaudePassthrough` step 6 (ซึ่งรวม block ว่าง + signature ของ Opus 5.5 / Fable 5.1 ที่ LP-003 ตั้งใจคง) → ปรับใน merge `c416e08f`: `normalizeClaudePassthrough(body, model, provider)` คง block ว่างที่มี signature เมื่อ provider = `claude`/`anthropic` · ปลายทางอื่นทิ้งตาม upstream · หลักฐานว่า Anthropic รับ: session `3c3adff9` 372/372 ok พร้อม block แบบนี้ 280 อัน (ดูหัวข้อ v0.5.104) · เทส `claude-native-thinking` +3
+
 **v0.5.91 audit:** KEPT — `claude.js` ไม่ถูกแตะระหว่าง v0.5.86→v0.5.91 และ upstream ยังทิ้ง block ตาม `isValidClaudeSignature` แล้ว `unshift` placeholder (`claude.js:272,287`)
 
 **Scope:** Claude Code native passthrough, including a single-model Combo routed to Claude.
@@ -842,7 +919,7 @@ streaming ได้ Anthropic SSE ครบ (`message_start` → `message_stop`)
 
 ## LP-016: `/v1/messages` + `stream:false` บน provider ที่บังคับ stream คืน body รูปแบบ OpenAI (เดิม Bug C)
 
-**Status:** ACTIVE · **Commit:** `8f7c6cde` · **Applied:** 2026-10-01 · **Upstream:** decolua/9router#3682, #3199, #3462 (ยัง OPEN ตอนตรวจ, ไม่มีโค้ดแก้ใน `upstream/master`) → CASE A
+**Status:** UPSTREAM_FIXED → REMOVED (`65cadf53`, 2026-10-19) · **Commit:** `8f7c6cde` · **Applied:** 2026-10-01 · **Upstream fix:** `1d4335d4` "fix(translator): return Claude messages for forced SSE JSON responses (#4789)" ใน v0.5.104 — ย้าย `openAICompletionToClaudeMessage` ไป `translator/concerns/claudeMessage.js` และเรียกทั้งกิ่ง Responses SSE และ Chat SSE เหมือนแพตช์นี้ · เทส `claude-forced-sse-nonstream.test.js` ของแพตช์ยังเก็บไว้ (เขียวบนโค้ด upstream) · เดิม: decolua/9router#3682, #3199, #3462 → CASE A
 
 **อาการ:** client รูปแบบ Claude (`POST /v1/messages`, `stream:false`) ที่วิ่งไป provider ซึ่งบังคับ stream ฝั่ง upstream
 (`grok-cli`, `codex` — executor ตั้ง `body.stream = true`) ได้ `{"object":"chat.completion","choices":[...]}` แทน `{"type":"message","content":[...]}`
@@ -1406,6 +1483,7 @@ delta ที่ไม่มี cache field (Anthropic แบบเดิม) ย
 ## LP-039: Haiku 5.5 ได้ `budget_tokens` แทน effort — combo `cc/claude-haiku-5-5(high)` ขึ้น `THINK:25k` (+ ราคา Haiku 5.5)
 
 **Status:** ACTIVE · **Commit:** `3848a5e2` (thinking/effort) + `eb2ce4e5` (ราคา) · **Implemented:** 2026-10-08 · พบตอนทดสอบ combo `9-haiku-level`
+**v0.5.104 audit:** KEPT — upstream `f5f88039` เพิ่ม `*claude*haiku-5*` เป็น `claude-budget` (conflict) และ `c8644368` ให้ adaptive เฉพาะ opencode-go (เทสคาดว่า provider อื่นเป็น budget) · regex `ADAPTIVE_THINKING_UNSUPPORTED` upstream ยัง `/haiku/i`, ไม่มีราคา haiku-5 → resolve คง adaptive (+ `pdf: true`), ย้าย guard budget ในเทส upstream ไปที่ Haiku 4.5
 
 ### ส่วนที่ 1 — thinking/effort (`3848a5e2`)
 
@@ -1460,7 +1538,8 @@ Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router 
 
 ## LP-040: `ag/gemini-4-argon` เพิ่มไม่ได้ (404 `Requested entity was not found.`) ทั้งที่ `agy` CLI ใช้ Gemini 4 Argon ได้
 
-**Status:** ACTIVE · **Commit:** `9b61ee41` · **Implemented:** 2026-10-15 · **Upstream:** ยังไม่มี (v0.5.99 ไม่มี `argon` ใน registry เลย) → CASE A
+**Status:** ACTIVE / MODIFIED (v0.5.104) · **Commit:** `9b61ee41` · **Implemented:** 2026-10-15 · **Upstream:** v0.5.99 ไม่มี `argon` เลย → CASE A · v0.5.104 `29fc880e` ลง `ag/gemini-4-argon-high` + caps `*gemini-4*` แต่ไม่เปลี่ยน UA → CASE C
+**v0.5.104 audit (2026-10-19):** probe live ด้วย token ของ connection — UA IDE 2.11.0 และ 2.22.0 (`cff2b1d9`) ได้ 26 โมเดล ไม่มี Argon + `generateContent gemini-4-argon-high` 404 · UA CLI 1.3.5 ได้ 29 + 200 → คง UA CLI, `-medium`/`-low`/alias, ราคา · ทิ้ง caps row `*gemini-4-argon*` (ใช้ `*gemini-4*` ของ upstream ค่าเท่ากัน) · row `-high` ซ้ำกับ upstream ทุกตัวอักษร (เก็บไว้แถวเดียว)
 **Deploy:** ติดตั้งพร้อม v0.5.99 (2026-10-15 09:11) ยืนยัน live แล้ว
 
 **อาการ:** Add Model / chat ด้วย `ag/gemini-4-argon` ได้ HTTP 503 ← `[antigravity/gemini-4-argon] [404]: Requested entity was not found.` (+ `modelLock_*` 2 นาที)
@@ -1495,6 +1574,7 @@ Claude Code จริง (`claude -p --settings ~/.claude/settings.json.9router 
 ## LP-041: muse ตอบ 200 แต่ว่าง (`finish_reason: "in_progress"`) เมื่อ reasoning ใช้ `max_output_tokens` หมด
 
 **Status:** ACTIVE · **Commit:** `6c969135` · **Implemented:** 2026-10-15 · **Upstream:** ยังไม่มี (v0.5.99 ไม่รู้จัก `response.incomplete` ที่ไหนเลย) → CASE A
+**v0.5.104 audit:** KEPT — `response.incomplete` 0 hit · upstream `8f4e3800` (combo fallback เมื่อ 200 ไม่มีเนื้อหา) นับ `length`/`max_tokens` เป็นการจบปกติ จึงไม่ข้ามโมเดลกับคำตอบที่แพตช์แปลงแล้ว
 **Deploy:** ติดตั้ง 2026-10-15 10:30 (พร้อมการถอด LP-020) — ยืนยันผ่าน gateway จริงด้วย `max_tokens: 64` (หมด budget แน่นอน):
 OpenAI stream `length` · Claude stream `message_delta stop_reason: max_tokens` → `message_stop` · Claude non-stream `max_tokens` ·
 Responses stream `response.incomplete` (ส่งผ่าน) · Responses non-stream `status: incomplete` + `incomplete_details` · usage ลง `usageHistory` ครบ 5/5 (output 64)

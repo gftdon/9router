@@ -7,10 +7,10 @@
 
 | รายการ | ค่า |
 |---|---|
-| Upstream base | `v0.5.104` (`87a74e1b`, มี tag) — merge `c416e08f` (2026-10-19) + ถอด LP-016 `65cadf53` · **ยังไม่ deploy / ยังไม่ push** · รอบก่อน `v0.5.99` (`ce4460ef`, ไม่มี tag) merge `3353e5fe` |
-| `origin/master` (`gftdon/9router`) | = `e84319ab` (ยังไม่มีรอบ v0.5.104; ทำบน branch `upgrade/v0.5.104` แล้ว fast-forward `master` ในเครื่อง) · ก่อนหน้า push ครบถึง LP-041 + ถอด LP-020 (2026-10-15, `34ad7467..b12aa41e` push ปกติ ไม่ force); รอบก่อน LP-040 + merge v0.5.99 (`838e9c13..34ad7467`) |
-| Build ที่ติดตั้ง global | `9router-0.5.99.tgz` จาก commit `9bbaf320` (โค้ด = `6c969135`: v0.5.99 + LP-040 + ถอด LP-020 + LP-041; 15,663,927 bytes, SHA-256 `ea66f187fa56c4aae18a335a4c115c5579808c4b478c10b9ce902287bb531d17`) — ติดตั้ง 2026-10-15 10:30 · สำรอง build เดิม (`9b61ee41`) + SQLite (`.backup` แบบ online, integrity ok, 250,393 แถว `usageHistory`) + plist ที่ `/tmp/9router-before-lp041-20261015/` (0700/0600) · รอบก่อน (09:11, 0.5.95 → `9b61ee41`) สำรองที่ `/tmp/9router-before-v0599-20261015/` |
-| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-10-15 10:30:37 (launcher PID 29035, listener 29053; KeepAlive=false จึงหยุด launcher → server แล้วติดตั้งได้โดยไม่เกิดใหม่เอง); `server.log` กลับมาเขียนแล้ว (LP-034) · ก่อนหน้านี้ (10–15 ต.ค.) ตัวที่รันเป็น `9router` ที่เปิดเองจาก zsh ไม่มี `--log` — ปิด launcher ก่อนแล้วค่อยปิด server ตอนติดตั้ง |
+| Upstream base | `v0.5.104` (`87a74e1b`, มี tag) — merge `c416e08f` (2026-10-19) + ถอด LP-016 `65cadf53` · deploy 2026-10-19 07:39 + push แล้ว · รอบก่อน `v0.5.99` (`ce4460ef`, ไม่มี tag) merge `3353e5fe` |
+| `origin/master` (`gftdon/9router`) | push รอบ v0.5.104 (2026-10-19, push ปกติ ไม่ force) จาก `e84319ab` ถึง commit docs ที่บันทึก deploy นี้ — ทำบน branch `upgrade/v0.5.104` แล้ว fast-forward `master` · ก่อนหน้า push ครบถึง LP-041 + ถอด LP-020 (2026-10-15, `34ad7467..b12aa41e` push ปกติ ไม่ force); รอบก่อน LP-040 + merge v0.5.99 (`838e9c13..34ad7467`) |
+| Build ที่ติดตั้ง global | `9router-0.5.104.tgz` จาก commit `8aad4cdc` (โค้ด = `65cadf53`: v0.5.104 + แพตช์ทั้งหมด − LP-016; 15,708,058 bytes, SHA-256 `d2d5758d25db1b6a4fd0045baac130dfb7c4e33ce7620851eb57e442a23e4319`) — ติดตั้ง 2026-10-19 07:39 · สำรอง build เดิม (0.5.99 จาก `9bbaf320`, SHA ตรงกับที่ติดตั้ง `ea66f187…`) + SQLite (`.backup` แบบ online, integrity ok, 257,539 แถว `usageHistory`) + plist ที่ `/tmp/9router-before-v05104-20261019/` (0700/0600, มี token ของ provider — ลบได้เมื่อไม่ต้อง rollback) · รอบก่อน (2026-10-15 10:30) สำรองที่ `/tmp/9router-before-lp041-20261015/` |
+| Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-10-19 07:39:13 (launcher PID 52298, server 52317; banner `🚀 9router v0.5.104`) · วิธีหยุด: `kill -TERM` launcher แล้ว server (KeepAlive=false ไม่เกิดใหม่เอง) → ติดตั้ง → kickstart |
 | Request logs | ปิดอยู่ — logs เดิมลบหมดแล้ว (2026-10-03 หลังทดสอบ LP-023..LP-025) เปิดใหม่ด้วย `ENABLE_REQUEST_LOGS=true 9router` เมื่อต้องดีบัก (เก็บ `x-api-key` แบบ plaintext) |
 | ค้างตรวจ | Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.104 / v0.5.99) |
 | ⚠️ ต้องทำเอง | **`cc/` (Claude Account 2) ใช้ไม่ได้ตั้งแต่ 2026-10-17 21:37 (เวลาไทย)** — refresh token หมดอายุ (`invalid_grant: Refresh token expired`, ทุก request ได้ 401→503) → login ใหม่ใน Dashboard › Providers › Claude (ไม่เกี่ยวกับการอัปเกรด พบตอนจะ probe 2026-10-19) |
@@ -131,6 +131,18 @@ Merge commit ของ fork: `c416e08f` (ทำบน branch `upgrade/v0.5.104` 
 - **Baselines:** `verify-providers` (94 providers byte-for-byte) / `verify-alias` / `verify-oauth-urls` **เท่ากับ upstream v0.5.104 เปล่า** (worktree แยก)
 - **ESLint:** ไฟล์ที่ resolve/แก้ ผ่าน (warning เดิม `import/no-anonymous-default-export` ใน registry) · `git diff --check` ผ่าน · **Build:** `npm run build` ผ่าน (รวม standalone assets)
 - **Versions:** root + CLI = **0.5.104** (merge พามา); upstream ไม่เพิ่ม dependency
+
+### Deploy + live verification (2026-10-19)
+
+- ก่อนหยุด: ดู `server.log` ว่าไม่มี request ค้าง (client `next-server` ที่รัน combo `9-content-scoring` จบ request สุดท้าย 07:36:30) · ตรวจ tarball ก่อนติดตั้ง: มี UA CLI ของ LP-040, `response.incomplete` ของ LP-041, step-6 ของ LP-003 (`!(g&&!u(a))` ใน chunk ที่ compile แล้ว), UA IDE 2.22.0, `gpt-5.6-sol` ของ image
+- `npm install --global ./9router-0.5.104.tgz` → `launchctl kickstart` → `/api/health` = `{"ok":true}`, banner `🚀 9router v0.5.104` · DB ไม่มี migrate ใหม่ (`SCHEMA_VERSION` 2 เท่าเดิม)
+- **Live probe (ผ่าน gateway จริง, non-stream):**
+  - `ag/gemini-3.8-flash` 200 (UA IDE 2.22.0 ใหม่ของ upstream) · `ag/gemini-4-argon-high` / `-medium` / `ag/gemini-4-argon` 200 `model=gemini-4-argon` · `/v1/messages` `ag/gemini-4-argon-high` → `message` `end_turn` (LP-040)
+  - `cx/gpt-6.1-sol` client Claude `stream:false` → `type: message`, `end_turn` (เส้น forced-SSE ของ upstream `1d4335d4` ที่มาแทน LP-016) · client OpenAI → `chat.completion`
+  - `muse/muse-spark-1.3-contributor` ปกติ `stop` "PONG" · `max_tokens: 64` → OpenAI `length` / Claude `max_tokens` + usage 64 (LP-041)
+  - **image:** `cx/gpt-image-2.5` → **200 + PNG 1.42 MB** (ก่อนหน้านี้ 400 ทุกครั้ง — upstream `7878f53b` แก้แล้ว) · combo `image-default` → 200 + PNG, usage บันทึก `codex/gpt-6.1-sol-image`
+  - `usageHistory` บันทึกครบทุก probe (12 แถว); ไม่มี warn `no pricing` ใน log แต่ cost ของ image = 0 (ยังไม่มีราคา `gpt-image-2.5` / `gpt-6.1-sol-image`)
+- **ไม่ได้ยืนยัน live:** LP-003 / LP-021 / LP-022 / LP-037 / LP-039 เส้น `cc/` — refresh token ของ Claude Account 2 หมดอายุ (ต้อง login ใหม่ก่อน) · ยืนยันด้วยเทส `claude-native-thinking` 18/18 + บิลด์ที่ติดตั้งมีโค้ดแล้ว
 
 ### Security notes ของ upstream v0.5.104 (ตรวจโดย deep-reasoner, read-only; spot-check บรรทัดหลักแล้ว)
 

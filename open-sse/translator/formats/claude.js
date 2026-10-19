@@ -376,7 +376,8 @@ export function normalizeClaudePassthrough(body, model = "", provider = null) {
   // LP-003: except a signed one bound for Anthropic itself — Opus 5.5 / Fable 5.1
   // reply with thinking "" + signature (display omitted) and Anthropic takes it
   // back (372/372 ok in one live Claude Code session carrying 280 such blocks).
-  // Dropping it would strip the thinking that must lead an open tool-use turn.
+  // Anthropic also answers without it, but the signature carries the encrypted
+  // reasoning, so keep the history exactly as Claude Code sends it direct.
   const keepSignedBlankThinking = provider === "claude" || provider === "anthropic";
   if (Array.isArray(body.messages)) {
     body.messages = body.messages.filter(msg => {

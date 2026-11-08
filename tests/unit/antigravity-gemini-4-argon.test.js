@@ -8,10 +8,10 @@ import antigravity from "../../open-sse/providers/registry/antigravity.js";
 import * as shared from "../../open-sse/providers/shared.js";
 import { applyThinking, stripThinkingSuffix } from "../../open-sse/translator/concerns/thinkingUnified.js";
 
-// LP-040: Antigravity serves Gemini 4 Argon only to the agy CLI identity. With the
-// IDE User-Agent the same account, body and endpoint get 404 "Requested entity was
-// not found." (and fetchAvailableModels omits the model); the CLI User-Agent gets 200.
-const AGY_CLI_USER_AGENT = "antigravity/cli/1.3.5 (aidev_client; os_type=darwin; arch=arm64; cl=998863838; auth_method=consumer)";
+// LP-040: Antigravity served Gemini 4 Argon only to the agy CLI identity while
+// 9Router sent the IDE User-Agent (404 "Requested entity was not found."). Upstream
+// f172c3c4 switched to the Hub User-Agent, which Google serves Argon to (probed
+// 2026-11-08), so the CLI override is gone; Argon must ride the shared Hub UA.
 const CREDENTIALS = { accessToken: "token", projectId: "project", connectionId: "connection" };
 
 function wireRequest(publicModel) {
@@ -64,13 +64,11 @@ describe("Gemini 4 Argon on Antigravity (LP-040)", () => {
     }
   });
 
-  it("sends the agy CLI User-Agent for Argon", () => {
-    expect(shared.ANTIGRAVITY_CLI_USER_AGENT).toBe(AGY_CLI_USER_AGENT);
-    expect(wireRequest("gemini-4-argon-high").headers["User-Agent"]).toBe(AGY_CLI_USER_AGENT);
-    expect(wireRequest("gemini-4-argon").headers["User-Agent"]).toBe(AGY_CLI_USER_AGENT);
-  });
-
-  it("keeps the IDE User-Agent for every other Antigravity model", () => {
-    expect(wireRequest("gemini-3.8-flash-high").headers["User-Agent"]).toBe(shared.ANTIGRAVITY_IDE_USER_AGENT);
+  it("sends Argon with the same Hub User-Agent as every other Antigravity model", () => {
+    expect(shared.ANTIGRAVITY_IDE_USER_AGENT).toMatch(/^antigravity\/hub\//);
+    for (const id of ["gemini-4-argon-high", "gemini-4-argon", "gemini-3.8-flash-high"]) {
+      expect(wireRequest(id).headers["User-Agent"]).toBe(shared.ANTIGRAVITY_IDE_USER_AGENT);
+    }
+    expect(shared.ANTIGRAVITY_CLI_USER_AGENT).toBeUndefined();
   });
 });

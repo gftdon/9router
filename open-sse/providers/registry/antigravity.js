@@ -45,8 +45,7 @@ export default {
     clientSecret: "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",
   },
   models: [
-    // LP-040: Gemini 4 Argon — CLI-only on Antigravity (executor sends the agy User-Agent).
-    // The -high row matches upstream's; -medium/-low and the bare alias are local.
+    // LP-040: the tier rows are upstream's; the bare gemini-4-argon alias (→ medium) is local.
     { id: "gemini-4-argon-high", name: "Gemini 4 Argon (High)", upstreamModelId: "gemini-4-argon-high(high)" },
     { id: "gemini-4-argon-medium", name: "Gemini 4 Argon (Medium)", upstreamModelId: "gemini-4-argon-medium(medium)" },
     { id: "gemini-4-argon-low", name: "Gemini 4 Argon (Low)", upstreamModelId: "gemini-4-argon-low(low)" },

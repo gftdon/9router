@@ -89,12 +89,12 @@ export const KIMI_CODING_BASE_URL = "https://api.kimi.com/coding/v1/messages";
 export const OPENAI_COMPAT_BASE = "https://api.openai.com/v1";
 export const ANTHROPIC_COMPAT_BASE = "https://api.anthropic.com/v1";
 
-// Official Antigravity IDE Desktop 2.22.0 fingerprint captured from macOS arm64.
+// Official Antigravity Hub Desktop 2.24.0 fingerprint captured from macOS arm64.
 // Keep this static even when 9router runs on Linux: the provider profile is
-// intentionally matching the IDE client, not the server host.
-export const ANTIGRAVITY_IDE_VERSION = "2.22.0";
+// intentionally matching the Hub client, not the server host.
+export const ANTIGRAVITY_IDE_VERSION = "2.24.0";
 export const ANTIGRAVITY_IDE_BASE_URL = "https://daily-cloudcode-pa.googleapis.com";
-export const ANTIGRAVITY_IDE_USER_AGENT = `antigravity/ide/${ANTIGRAVITY_IDE_VERSION} darwin/arm64`;
+export const ANTIGRAVITY_IDE_USER_AGENT = `antigravity/hub/${ANTIGRAVITY_IDE_VERSION} darwin/arm64`;
 
 // LP-040: Gemini 4 Argon is served only to the agy CLI identity — the IDE
 // User-Agent gets 404 "Requested entity was not found." on the same account.

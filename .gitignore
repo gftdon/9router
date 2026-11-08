@@ -114,3 +114,4 @@ AGENTS.md
 bun.lock
 cli/bun.lock
 .Ignore
+.scratch/

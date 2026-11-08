@@ -148,7 +148,8 @@ describe("muse direct provider effort levels", () => {
       provider: "opencode-go",
       credentials: { apiKey: "test-key", providerSpecificData: {} },
     });
-    expect(wire.url).toContain("/zen/go/v1/responses");
+    // Upstream 7ef6df56 moved OpenCode Go off /zen/go/v1 to the current inference endpoint.
+    expect(wire.url).toContain("/inference/go/openai/v1/responses");
     expect(wire.body.reasoning).toMatchObject({ effort: "max" });
   });
 });

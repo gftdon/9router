@@ -30,13 +30,23 @@ const MODEL_MAP = {
   "grok-4.20-beta": { grokModel: "grok-4-1-thinking-1129", modelMode: "MODEL_MODE_GROK_420", isThinking: false },
 };
 
-// Grok Imagine free tier renders 480p; 720p exists on paid quota keys but the
-// 480p request is what a logged-out-of-SuperGrok account reliably gets.
-const GROK_VIDEO_RESOLUTION = "480p";
+// 480p stays the default so free accounts keep working; SuperGrok accounts can
+// ask for 720p (LP-043 — verified live 2026-11-09, grok.com returns 1280x720).
+const GROK_VIDEO_RESOLUTIONS = ["480p", "720p"];
+const GROK_VIDEO_DEFAULT_RESOLUTION = "480p";
 const VIDEO_TURN_TIMEOUT_MS = 300000;
 
+const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
+
+function resolveVideoResolution(resolution) {
+  if (resolution === undefined || resolution === null || resolution === "") return GROK_VIDEO_DEFAULT_RESOLUTION;
+  const wanted = String(resolution).toLowerCase();
+  if (GROK_VIDEO_RESOLUTIONS.includes(wanted)) return wanted;
+  throw badRequest(`Grok Web video supports resolution ${GROK_VIDEO_RESOLUTIONS.join(" | ")} (got "${resolution}")`);
+}
+
 /** Grok Imagine video payload — captured from grok.com/imagine submit. */
-function buildGrokVideoPayload({ prompt, size, duration }) {
+function buildGrokVideoPayload({ prompt, size, duration, resolutionName }) {
   const aspectRatio = /^\d{1,2}:\d{1,2}$/.test(String(size || "")) ? String(size) : "16:9";
   return {
     modelName: "imagine-video-gen",
@@ -50,7 +60,7 @@ function buildGrokVideoPayload({ prompt, size, duration }) {
         prompt,
         aspectRatio,
         duration: Number.isFinite(Number(duration)) && Number(duration) > 0 ? Number(duration) : 6,
-        resolutionName: GROK_VIDEO_RESOLUTION,
+        resolutionName,
       },
     },
     kind: "CONVERSATION_KIND_IMAGINE",
@@ -495,11 +505,13 @@ export class GrokWebExecutor extends BaseExecutor {
    *   "imagine-video-gen" + mediaGenInput.textToVideo; the mp4 asset URL is
    *   deep-scanned from the NDJSON reply (exact chunk shape varies).
    */
-  async generateMedia({ prompt, kind = "image", size, duration, n = 1, credentials, signal, log }) {
+  async generateMedia({ prompt, kind = "image", size, duration, resolution, n = 1, credentials, signal, log }) {
     if (kind !== "image" && kind !== "video") throw new Error("Grok Web supports image and video generation only");
     if (!prompt?.trim()) throw new Error("prompt is required for media generation");
-    // Video quota is ~1/day even on paid tiers — never loop video requests.
+    // Never loop video requests — each one spends account video quota.
     const iterations = kind === "video" ? 1 : Math.max(1, n);
+    // Validate before any network call so a bad value is a 400.
+    const resolutionName = kind === "video" ? resolveVideoResolution(resolution) : null;
 
     const cookieHeader = buildGrokCookieHeader(String(credentials?.apiKey || ""));
     if (!cookieHeader) {
@@ -525,7 +537,7 @@ export class GrokWebExecutor extends BaseExecutor {
         Cookie: cookieHeader,
       };
       const payload = kind === "video"
-        ? buildGrokVideoPayload({ prompt, size, duration })
+        ? buildGrokVideoPayload({ prompt, size, duration, resolutionName })
         : {
           temporary: true,
           modelName: "grok-4-1-thinking-1129",

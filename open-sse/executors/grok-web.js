@@ -5,8 +5,11 @@ import { sseChunk } from "../utils/sse.js";
 import { GROK_TLS_USER_AGENT, GrokTlsUnavailableError, grokTlsFetch, isCloudflareChallenge } from "../services/grokTlsClient.js";
 import { buildToolRegistry, buildGrokMessage, mapNativeToolCard, parseClientToolCallMarkup, hasOpenToolCallMarkup } from "./grok-web-tools.js";
 import { buildGrokCookieHeader } from "../utils/webCookieAuth.js";
+import { fetchImageAsBase64, parseDataUri } from "../translator/concerns/image.js";
+import { FETCH_TIMEOUT_MS } from "../config/mediaConfig.js";
 
 const GROK_CHAT_API = PROVIDERS["grok-web"].baseUrl;
+const GROK_UPLOAD_API = new URL("/rest/app-chat/upload-file", GROK_CHAT_API).toString();
 const IMAGE_TURN_TIMEOUT_MS = 170000;
 
 // Everything routes to grok-4-1-thinking-1129 — the only modelName the
@@ -45,25 +48,112 @@ function resolveVideoResolution(resolution) {
   throw badRequest(`Grok Web video supports resolution ${GROK_VIDEO_RESOLUTIONS.join(" | ")} (got "${resolution}")`);
 }
 
-/** Grok Imagine video payload — captured from grok.com/imagine submit. */
-function buildGrokVideoPayload({ prompt, size, duration, resolutionName }) {
-  const aspectRatio = /^\d{1,2}:\d{1,2}$/.test(String(size || "")) ? String(size) : "16:9";
+/**
+ * Resolve the single image-to-video input to { mime, base64 }, or null when
+ * there is none. Remote URLs go through fetchImageAsBase64 (DNS-pinned public
+ * IPs only, size cap, magic-byte check) — never a plain fetch.
+ */
+async function resolveInputImage(images, signal) {
+  const refs = [].concat(images ?? []).filter((ref) => typeof ref === "string" && ref);
+  if (refs.length === 0) return null;
+  if (refs.length > 1) throw badRequest("Grok Web image-to-video accepts exactly one input image");
+  const [ref] = refs;
+
+  let dataUri = ref;
+  if (/^https?:\/\//i.test(ref)) {
+    const fetchSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(FETCH_TIMEOUT_MS)]) : undefined;
+    const fetched = await fetchImageAsBase64(ref, { signal: fetchSignal });
+    if (!fetched) throw badRequest("could not fetch the input image (blocked address, too large, or not an image)");
+    dataUri = fetched.url;
+  }
+  const parsed = parseDataUri(dataUri);
+  if (!parsed || !/^image\//i.test(parsed.mimeType)) {
+    throw badRequest("input image must be an http(s) URL or a data:image/...;base64 URI");
+  }
+  return { mime: parsed.mimeType, base64: parsed.base64 };
+}
+
+function grokHeaders(cookieHeader, accept) {
+  const requestId = crypto.randomUUID();
   return {
+    "Content-Type": "application/json",
+    Accept: accept,
+    "User-Agent": GROK_TLS_USER_AGENT,
+    "Sec-Ch-Ua": '"Chromium";v="146", "Not(A:Brand";v="24"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"macOS"',
+    Origin: "https://grok.com",
+    Referer: "https://grok.com/",
+    "Browser-Id": requestId,
+    "x-xai-request-id": requestId,
+    "x-statsig-id": generateStatsigId(),
+    Cookie: cookieHeader,
+  };
+}
+
+/** Upload an image to grok.com (as the Imagine page does) and return its asset id. */
+async function uploadGrokImage({ image, cookieHeader, signal }) {
+  const ext = image.mime.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+  const res = await grokTlsFetch(GROK_UPLOAD_API, {
+    method: "POST",
+    headers: grokHeaders(cookieHeader, "application/json"),
+    body: JSON.stringify({
+      fileName: `input.${ext}`,
+      fileMimeType: image.mime,
+      content: image.base64,
+      fileSource: "IMAGINE_SELF_UPLOAD_FILE_SOURCE",
+    }),
+    timeoutMs: 120000,
+    signal,
+  });
+  const text = await res.text();
+  if (!res.ok || isCloudflareChallenge(text)) {
+    throw Object.assign(new Error(`grok image upload failed: HTTP ${res.status} ${text.slice(0, 200)}`), { status: res.status });
+  }
+  let assetId = null;
+  try { assetId = JSON.parse(text)?.fileMetadataId || null; } catch { /* not JSON */ }
+  if (!assetId) throw new Error("grok image upload returned no fileMetadataId");
+  return assetId;
+}
+
+/**
+ * Grok Imagine video payload — captured from grok.com/imagine submit.
+ * With inputAssetId it is image-to-video; the aspect ratio is then left to
+ * grok (it follows the image) unless the caller passed a size.
+ */
+function buildGrokVideoPayload({ prompt, size, duration, resolutionName, inputAssetId }) {
+  const aspectRatio = /^\d{1,2}:\d{1,2}$/.test(String(size || "")) ? String(size) : null;
+  const seconds = Number.isFinite(Number(duration)) && Number(duration) > 0 ? Number(duration) : 6;
+  const base = {
     modelName: "imagine-video-gen",
     message: `${prompt} --mode=custom`,
     enableImageStreaming: true,
     enableSideBySide: true,
     sendFinalMetadata: true,
     responseMetadata: { experiments: [], modelConfigOverride: { modelMap: {} } },
-    mediaGenInput: {
-      textToVideo: {
-        prompt,
-        aspectRatio,
-        duration: Number.isFinite(Number(duration)) && Number(duration) > 0 ? Number(duration) : 6,
-        resolutionName,
-      },
-    },
     kind: "CONVERSATION_KIND_IMAGINE",
+  };
+  if (inputAssetId) {
+    return {
+      ...base,
+      fileAttachments: [inputAssetId],
+      mediaGenInput: {
+        imageToVideo: {
+          prompt,
+          inputAssets: [inputAssetId],
+          ...(aspectRatio ? { aspectRatio } : {}),
+          duration: seconds,
+          resolutionName,
+          mode: "custom",
+        },
+      },
+    };
+  }
+  return {
+    ...base,
+    mediaGenInput: {
+      textToVideo: { prompt, aspectRatio: aspectRatio || "16:9", duration: seconds, resolutionName },
+    },
   };
 }
 
@@ -502,42 +592,33 @@ export class GrokWebExecutor extends BaseExecutor {
    *   cardAttachment JSON-line chunk (progress 100, relative assets.grok.com
    *   path).
    * - video: Grok Imagine turn captured from grok.com/imagine — modelName
-   *   "imagine-video-gen" + mediaGenInput.textToVideo; the mp4 asset URL is
-   *   deep-scanned from the NDJSON reply (exact chunk shape varies).
+   *   "imagine-video-gen" + mediaGenInput.textToVideo, or imageToVideo when
+   *   one input image is given (uploaded first via upload-file); the mp4 asset
+   *   URL is deep-scanned from the NDJSON reply (exact chunk shape varies).
    */
-  async generateMedia({ prompt, kind = "image", size, duration, resolution, n = 1, credentials, signal, log }) {
+  async generateMedia({ prompt, kind = "image", size, duration, resolution, images, n = 1, credentials, signal, log }) {
     if (kind !== "image" && kind !== "video") throw new Error("Grok Web supports image and video generation only");
     if (!prompt?.trim()) throw new Error("prompt is required for media generation");
     // Never loop video requests — each one spends account video quota.
     const iterations = kind === "video" ? 1 : Math.max(1, n);
-    // Validate before any network call so a bad value is a 400.
+
+    // Validate video options before any network call so bad input is a 400.
     const resolutionName = kind === "video" ? resolveVideoResolution(resolution) : null;
+    const inputImage = kind === "video" ? await resolveInputImage(images, signal) : null;
 
     const cookieHeader = buildGrokCookieHeader(String(credentials?.apiKey || ""));
     if (!cookieHeader) {
       throw new Error("Grok Web requires the grok.com Cookie header (sso) pasted into the connection");
     }
 
+    const inputAssetId = inputImage ? await uploadGrokImage({ image: inputImage, cookieHeader, signal }) : null;
+
     const results = [];
     for (let i = 0; i < iterations; i++) {
       if (signal?.aborted) throw new Error("aborted");
-      const requestId = crypto.randomUUID();
-      const headers = {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        "User-Agent": GROK_TLS_USER_AGENT,
-        "Sec-Ch-Ua": '"Chromium";v="146", "Not(A:Brand";v="24"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"macOS"',
-        Origin: "https://grok.com",
-        Referer: "https://grok.com/",
-        "Browser-Id": requestId,
-        "x-xai-request-id": requestId,
-        "x-statsig-id": generateStatsigId(),
-        Cookie: cookieHeader,
-      };
+      const headers = grokHeaders(cookieHeader, "text/event-stream");
       const payload = kind === "video"
-        ? buildGrokVideoPayload({ prompt, size, duration, resolutionName })
+        ? buildGrokVideoPayload({ prompt, size, duration, resolutionName, inputAssetId })
         : {
           temporary: true,
           modelName: "grok-4-1-thinking-1129",

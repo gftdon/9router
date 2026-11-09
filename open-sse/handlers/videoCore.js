@@ -34,11 +34,13 @@ async function executeExecutorDrivenVideo({ provider, rawBody, credentials, sign
     return createErrorResult(HTTP_STATUS.BAD_REQUEST, `[${provider}] video request requires a prompt`);
   }
 
-  // Image-to-video: accept `image`/`image_url` (string) or `images`/`image_urls` (array)
+  // Image-to-video: accept `image`/`image_url` (string, or xAI-style `{ url }`)
+  // or `images`/`image_urls` (array of either)
   const imageRefs = []
     .concat(parsed.image ?? parsed.image_url ?? [])
     .concat(Array.isArray(parsed.images) ? parsed.images : [])
     .concat(Array.isArray(parsed.image_urls) ? parsed.image_urls : [])
+    .map((ref) => (typeof ref?.url === "string" ? ref.url : ref))
     .filter((ref) => typeof ref === "string" && ref);
 
   const { getExecutor } = await import("../executors/index.js");

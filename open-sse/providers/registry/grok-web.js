@@ -26,7 +26,7 @@ export default {
   },
   models: [
     { id: "grok-image", name: "Grok Imagine Image", params: ["n", "size"], kind: "image" },
-    { id: "grok-video", name: "Grok Imagine Video", params: ["seconds", "size", "resolution"], kind: "video" },
+    { id: "grok-video", name: "Grok Imagine Video", params: ["seconds", "size", "resolution", "image"], kind: "video" },
     { id: "grok-3", name: "Grok 3" },
     { id: "grok-3-mini", name: "Grok 3 Mini (Thinking)" },
     { id: "grok-3-thinking", name: "Grok 3 Thinking" },

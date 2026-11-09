@@ -15,6 +15,7 @@
 | ค้างตรวจ | Hermes settings ไม่ escape YAML/.env (MEDIUM เมื่อ `requireLogin=false`, ดู Security notes v0.5.104 / v0.5.99) · ใหม่ v0.5.116: `commandcode` auto-import ไม่อยู่ใน guard ของ dashboard, lazy runtime `npm install` ไม่ pin / ไม่ `--ignore-scripts`, TLS fallback แบบ insecure (ดู Security notes v0.5.116) |
 | `cc/` (Claude) | ผู้ใช้ login ใหม่แล้ว 2026-10-19 (connection ใหม่ `75efbdff`, Account 2) — เดิม refresh token หมดอายุตั้งแต่ 2026-10-17 21:37 (`invalid_grant`, ทุก request 401→503) · ยืนยันเส้น `cc/` live หลัง login แล้ว (ดู Deploy v0.5.104) |
 | LP-021 | ติดตั้งแล้ว (build จาก `2735ef3a`) และยืนยัน live กับ Claude Code จริงแล้ว (2026-10-03) — signature ที่ไม่ว่างของ kimi แก้ด้วย LP-022 |
+| LP-043 | commit แล้ว 2026-11-09 (`cc49487c`, `2f30f42d`) **ยังไม่ deploy** — gateway ที่รันอยู่ (build `8f25c2d6`) ยังฝัง 480p และไม่มี image-to-video ของ `gw/grok-video` |
 
 ## สรุป patch ทั้งหมด (ตามลำดับ commit)
 
@@ -26,6 +27,7 @@
 | `b35cdcac` (+ ปรับใน merge `c416e08f`) | `open-sse/translator/formats/claude.js`, `open-sse/handlers/chatCore.js` | LP-003: preserve native Claude thinking blocks and opaque signatures | ACTIVE / KEPT (v0.5.116 — conflict ใน `claude.js` มาจาก `0ad0a722` คนละบล็อก; `keepSignedBlankThinking` อยู่ใน chunk ที่ compile แล้ว) · MODIFIED (v0.5.104 — upstream `c8644368` ทิ้ง thinking ว่างบน passthrough; คง block ที่มี signature เมื่อปลายทางเป็น `claude`/`anthropic`) |
 | `ac47e8b7` | `open-sse/executors/default.js` | LP-004: forward the actual Claude Code client version | ACTIVE / KEPT (v0.5.95) |
 | `83bda598` | `open-sse/providers/shared.js` | LP-005: update the dashboard compatibility default for Opus 5.5 | UPSTREAM_FIXED (`cbffeb97`) |
+| `cc49487c` + `2f30f42d` | `open-sse/executors/grok-web.js`, `open-sse/handlers/videoCore.js`, `open-sse/providers/registry/grok-web.js` | LP-043: `gw/grok-video` (Grok Web subscription) รับ `resolution` 480p/720p (เดิมฝัง 480p) + image-to-video ด้วยรูป 1 รูป (upload-file → `mediaGenInput.imageToVideo`) + videoCore รับ `image: { url }` แบบ xAI | ACTIVE (ยังไม่ deploy) |
 | `6c969135` | `open-sse/transformer/streamToJsonConverter.js`, `open-sse/handlers/chatCore/sseToJsonHandler.js`, `open-sse/translator/{concerns/finishReason.js,response/openai-responses.js,schema/*}`, `open-sse/utils/usageTracking.js` | LP-041: Responses upstream จบด้วย `response.incomplete` (`max_output_tokens` — muse เมื่อ reasoning ใช้ budget หมด) → เดิมได้ 200 ว่าง `finish_reason: "in_progress"` และไม่บันทึก usage · ตอนนี้ได้ `length` / `max_tokens` / `status: incomplete` + usage | ACTIVE / KEPT (v0.5.116 — upstream `ca7b5401` เพิ่ม `RESPONSES_INCOMPLETE_REASON` แต่ใช้แค่ใน combo `emptyFailover`; แพตช์เปลี่ยนไปใช้ constant ของ upstream แทน `RESPONSES_INCOMPLETE` เดิม · เทส LP-041 บน upstream เปล่าแดง 9/9) · deploy + ยืนยัน live แล้ว 2026-10-15 10:35 |
 | `9b61ee41` | `open-sse/executors/antigravity.js`, `open-sse/providers/{shared.js,registry/antigravity.js,capabilities.js,pricing.js}` | LP-040: Gemini 4 Argon บน Antigravity — Google ให้เฉพาะ User-Agent ของ `agy` CLI (UA แบบ IDE ได้ 404) → ส่ง UA แบบ CLI **เฉพาะ** `gemini-4-argon*` + ลงทะเบียน `ag/gemini-4-argon-{high,medium,low}` และ `ag/gemini-4-argon` (→ medium) + caps + ราคา | ACTIVE / MODIFIED (v0.5.116 — upstream `f172c3c4` (#4816) เปลี่ยน UA เป็น `antigravity/hub/2.24.0` + ลง `-medium`/`-low`; probe live 2026-11-08 UA hub 2.24.0 ได้ Argon 200 ทั้ง 3 ระดับ → **ถอด UA CLI แล้ว (`8f25c2d6`, ส่วนนี้ UPSTREAM_FIXED)** เหลือ alias `ag/gemini-4-argon` (→ medium) + ราคา · v0.5.104: `29fc880e` ลง `-high` + `*gemini-4*` caps → ทิ้ง caps row ของเอง) · deploy v0.5.99 2026-10-15 09:13 |
 | `3848a5e2` + `eb2ce4e5` | `open-sse/providers/capabilities.js`, `open-sse/translator/formats/claude.js`, `open-sse/providers/pricing.js` | LP-039: Haiku 5.x ได้ `thinking: adaptive` + `output_config.effort` แทน `budget_tokens` (เดิมกฎของ Haiku 4.5 ครอบทุกรุ่น → `(high)` ขึ้น `THINK:25k`) · Haiku 4.5 ยังเป็น budget · ราคา Haiku 5.5 แบบ 2 ขั้นตามความยาว prompt ($0.10/$0.50 ≤100k, $0.50/$2.50 >100k; เดิมตก glob Haiku 4.5 แพง 10 เท่า) | ACTIVE / MODIFIED (v0.5.116 — upstream `0ad0a722` แทน regex `ADAPTIVE_THINKING_UNSUPPORTED` ด้วย `isAdaptiveThinkingUnsupported(model)` (Haiku ≥5 = adaptive) → ส่วน passthrough ของ `claude.js` UPSTREAM_FIXED ใช้ของ upstream; caps row `*claude*haiku-5*` upstream ยัง `claude-budget` → คง adaptive + ราคา · v0.5.104: `f5f88039` conflict, ปรับเทส upstream 2 ไฟล์) · deploy 2026-10-08 09:33 |
@@ -1720,6 +1722,62 @@ client OpenAI/Claude/Responses × non-stream/stream + usage ถูกบัน�
 
 **⚠️ เช็คตอน upgrade:** grep `response.incomplete` ใน `open-sse/` — ถ้า upstream จัดการเองทั้ง 4 จุด (converter, sseToJson, translator stream, extractUsage)
 → รันเทสนี้บน upstream เปล่า ถ้าเขียว 11/11 = UPSTREAM_FIXED; ถ้าเขียวบางส่วน = CASE C เก็บเฉพาะจุดที่ยังแดง
+
+## LP-043: Grok Web (`gw/grok-video`) ล็อก 480p และรับรูปทำ image-to-video ไม่ได้
+
+**Status:** ACTIVE · **Commits:** `cc49487c` (720p) + `2f30f42d` (image-to-video) · **Implemented:** 2026-11-09 · **Upstream:** ยังไม่มี (v0.5.116 ฝัง `GROK_VIDEO_RESOLUTION = "480p"` และสร้างแค่ `textToVideo`) → CASE A
+**Deploy:** ยังไม่ได้ deploy (build ที่ติดตั้งยังเป็น `8f25c2d6`)
+
+**อาการ:**
+- `grok-video` ได้ 480p เสมอแม้บัญชี SuperGrok — executor ฝัง `resolutionName: "480p"` ไม่สน `resolution` ที่ `videoCore` ส่งมาให้อยู่แล้ว
+- ส่งรูปไปแล้วถูกทิ้งเงียบๆ ได้วิดีโอจาก text ล้วน — executor สร้างแค่ `mediaGenInput.textToVideo`; และ body แบบ xAI `image: { url }` ถูก `videoCore` กรองทิ้งเพราะรับแค่ string
+
+**ข้อมูลจาก grok.com (2026-11-09, บัญชี SuperGrok):**
+- `resolutionName` เป็นค่าที่ client เลือกเอง — ยิง `720p` ได้ HTTP 200, stream ตอบ `resolutionName: "720p"`, `width: 1280`, `height: 720`; ไฟล์จริง 1280×720 H.264 24fps 6.04s + AAC (ffprobe)
+- JS bundle ของ grok.com/imagine (`cdn.grok.com/_next/static/chunks/*`): image-to-video =
+  `POST /rest/app-chat/upload-file` `{ fileName, fileMimeType, content: <base64>, fileSource: "IMAGINE_SELF_UPLOAD_FILE_SOURCE" }` → `fileMetadataId`
+  แล้ว `conversations/new` ด้วย `mediaGenInput.imageToVideo { prompt, inputAssets: [fileMetadataId], aspectRatio?, duration, resolutionName, mode }`
+  (server แปลงเป็น `videoGenModelConfig.imageReferences` + `isRootUserUploaded: true`)
+- ไม่ส่ง `aspectRatio` ใน `imageToVideo` → grok ใช้สัดส่วนของรูป: รูป 404×720 → วิดีโอ 704×1280, รูป 2370×1927 → 1056×864 (pixel budget ใกล้ 1280×720)
+- comment เดิม "video quota ~1 ต่อวัน" ไม่ตรงกับบัญชีนี้ (สร้างได้ 5+ คลิปในวันเดียว) — แก้ comment แล้ว แต่ยังส่ง 1 request ต่อครั้งเหมือนเดิม
+
+**แก้:**
+- part 1 `cc49487c` — `resolveVideoResolution()`: ไม่ส่ง = `480p` (บัญชีฟรีใช้ได้เหมือนเดิม), `480p`/`720p` ส่งผ่าน, ค่าอื่น → 400 ก่อนเรียก grok.com · registry `grok-video` params + `resolution`
+- part 2 `2f30f42d` — รูป 1 รูปต่อ request:
+  - `resolveInputImage()`: `http(s)` URL → `fetchImageAsBase64` เท่านั้น; `data:image/*;base64,` ใช้ตรง; อย่างอื่น / URL ที่ถูกบล็อก / มากกว่า 1 รูป → 400 ก่อนเรียก grok.com
+  - `uploadGrokImage()` → `fileMetadataId`; upload ล้มเหลว → throw พร้อม status จริง (ไม่ไปขั้นสร้างวิดีโอ)
+  - `buildGrokVideoPayload()` มี `inputAssetId` → `imageToVideo` + `fileAttachments: [id]`, `mode: "custom"`, ไม่ส่ง `aspectRatio` ถ้าไม่มี `size`
+  - `grokHeaders()` ใช้ร่วมกันระหว่าง upload กับ turn (แทน header ที่เขียนซ้ำใน loop)
+  - `videoCore.executeExecutorDrivenVideo`: `image` / `images[]` รับ object `{ url }` ด้วย (มีผลกับ executor-driven provider ทุกตัว — เดิม object ถูกทิ้ง)
+  - registry `grok-video` params + `image`
+
+**Security:**
+- ไม่มี fetch ใหม่ที่ไม่ผ่าน guard — URL รูปผ่าน `fetchImageAsBase64` (DNS pin กัน rebinding, บล็อก private/loopback/metadata/CGNAT, `redirect: manual`, ≤10MB, ตรวจ magic bytes) และจำกัดเวลา 10s รวมกับ signal ของ request (`AbortSignal.any`)
+- error ฝั่ง input เป็น 400 → `checkFallbackError` ถือเป็น request-scoped ไม่ล็อก connection; upload ได้ 401/403 → ส่ง status จริงให้ระบบ mark connection (คุกกี้หมดอายุ)
+- รูปที่อัปโหลดค้างอยู่ในบัญชี grok.com ของเจ้าของคุกกี้ · รูปที่อัปโหลดโดน `MODERATION_RULE_UPLOADED` (เข้มกว่า โดยเฉพาะรูปคนจริง)
+- ไม่ได้แก้ (นอกขอบเขต): LOW เดิม — `findGrokVideoUrl` ส่ง Cookie ไป host ของ video URL โดยไม่ตรวจ host ยังอยู่ · `uc-web` `resolveImageBytes` ดึง URL รูปด้วย `fetch` ตรง ไม่มี SSRF guard
+
+**Test:** `tests/unit/grok-web-video.test.js` 11 tests (mock `grokTlsClient` + `fetchImageAsBase64`, ไม่มีคุกกี้จริง): 480p default / 720p / 1080p → 400 /
+upload data URI → `imageToVideo` / aspect ตามรูปเว้นแต่มี `size` / URL ผ่าน fetcher ที่มี guard / URL ถูกบล็อก → 400 / `file://` → 400 / 2 รูป → 400 / upload 401 ไม่ไปขั้นสร้าง /
+`videoCore` รับ `image: { url }` — รันกับ source ก่อนแก้: แดง 10 / เขียว 1 (480p default) → หลังแก้ 11/11
+· เทส video ที่เกี่ยวข้อง 5 ไฟล์ 72/72 · full suite 4,717 tests: 4,570 passed / 48 failed — **ชุด failure เดียวกับ HEAD `1e9b76a7` ทุกตัว (0 pass→fail)**;
+`verify-no-regression.mjs` รายงาน 48 เพราะ `known-fails.txt` ไม่รวมเทสที่แดงอยู่เดิมชุดนี้ (17 ไฟล์ เช่น oauth-cursor-auto-import, qoder-proxy-replay, token-refresh-generic) · eslint ผ่าน
+· ⚠️ รัน full suite แล้ว vitest เขียน snapshot ใหม่ลง `tests/translator/__snapshots__/golden-url-header.test.js.snap` (chatgpt-web ฯลฯ) — revert ทิ้งแล้ว ไม่อยู่ใน commit
+
+**ยืนยัน live (2026-11-09):**
+- probe ตรงกับ grok.com: text-to-video 720p → 1280×720 · image-to-video 720p (รูป 16:9) → 1280×720, SSIM เฟรมแรกเทียบรูป 0.989 · ไม่ส่ง aspect + รูปแนวตั้ง → 704×1280
+- โค้ดหลังแก้ (`handleVideoProxyCore` → `GrokWebExecutor` จาก source ใต้ vitest, ไม่ผ่าน gateway ที่รันอยู่): body แบบ xAI
+  `{ model: "grok-video", prompt, image: { url: <jpg บน upload.wikimedia.org> }, resolution: "720p" }` → success, 1056×864 6.04s, เฟรมแรกตรงรูป
+
+**วิธีใช้ (หลัง deploy):**
+```bash
+curl -s http://localhost:20128/v1/videos/generations -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"gw/grok-video","prompt":"The woman slowly turns toward the camera and smiles","image":{"url":"https://example.com/person.jpg"},"resolution":"720p"}'
+# image รับ "https://…", "data:image/jpeg;base64,…", หรือ { "url": … } · ไม่ใส่ image = text-to-video · ไม่ใส่ resolution = 480p
+```
+
+**⚠️ เช็คตอน upgrade:** grep `GROK_VIDEO_RESOLUTION` / `imageToVideo` / `upload-file` ใน `open-sse/executors/grok-web.js` และ `ref?.url` ใน `videoCore.js` —
+ถ้า upstream รับ `resolution` + ทำ image-to-video เอง → รันเทสนี้บน upstream เปล่า: เขียว 11/11 = UPSTREAM_FIXED, เขียวบางส่วน = CASE C
 
 ## Patch ที่ยังไม่ได้แก้ (รอตัดสินใจ)
 

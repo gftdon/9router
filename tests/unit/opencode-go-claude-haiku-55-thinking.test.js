@@ -34,12 +34,21 @@ describe("opencode-go claude-haiku-5-5 thinking shape", () => {
   });
 
   it("other providers keep the budget shape for Haiku 4.5", () => {
-    // LP-039: Anthropic also wants adaptive for claude-haiku-5-5 (the budget shape
-    // showed THINK:25k); the budget guard holds for the 4.5 id.
+    // LP-039: the budget guard holds for the 4.5 id.
     const body = applyThinking("claude", "claude-haiku-4-5", { ...claudeWireBody(), model: "claude-haiku-4-5" }, "claude");
 
     expect(body.thinking?.type).toBe("enabled");
     expect(body.thinking?.budget_tokens).toBeGreaterThan(0);
     expect(body.output_config).toBeUndefined();
+  });
+
+  it("the 5.x line keeps the adaptive shape on every provider", () => {
+    // Haiku 5.5 is adaptive-only on the Claude API too (the 4.x ids are the ones
+    // that still take the extended-thinking budget shape).
+    const body = applyThinking("claude", "claude-haiku-5-5", claudeWireBody(), "claude");
+
+    expect(body.thinking?.type).toBe("adaptive");
+    expect(body.thinking).not.toHaveProperty("budget_tokens");
+    expect(body.output_config?.effort).toBeTruthy();
   });
 });

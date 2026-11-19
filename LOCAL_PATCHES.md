@@ -127,7 +127,7 @@ Branch `upgrade/v0.5.119` (ยัง**ไม่** fast-forward `master`, ยั�
 - หยุด launcher 7984 / server 8042 ตอน 10:45:07 → `npm install --global ./9router-0.5.119.tgz` (changed 11 packages) → `launchctl kickstart` 10:45:14 → `/api/health` ok 10:45:18 (ดับ ~11 วินาที) · `npm ls -g` = `9router@0.5.119`, banner `🚀 9router v0.5.119`, Next.js 16.4.5, DB driver `better-sqlite3`
 - **Live probe (ผ่าน gateway จริง):**
   - `cc/claude-haiku-5-5(high)` ผ่าน `claude -p --settings ~/.claude/settings.json.9router` → "PONG", log `FMT: claude (passthrough) · THINK:high` (LP-039 adaptive; ไม่มี `claude_code_version_too_old` = LP-004 ใช้ได้) · prompt 161,436 (cache write 161,432) → `usageHistory` cost **$0.100910 = เรตขั้น >100k** (เรตสั้นจะเป็น $0.0202) — ยืนยัน `858d8010` live
-  - **ไม่ได้ทดสอบ live:** LP-040 (alias Argon / ราคา `gemini-4-*`) — ไม่มี connection `antigravity` เหลือใน DB เลย (ทั้งก่อนและหลัง upgrade; ใช้ล่าสุด 2026-11-14 12:22) → `No active credentials for provider: antigravity` · `claude -p --model ag/...` ถูก Claude Code ปฏิเสธเอง (`unrecognized_model`) ต้องยิง `/v1/chat/completions` ตรง · LP-041 (connection `muse` ปิดอยู่เหมือนรอบก่อน)
+  - **ไม่ทดสอบ live:** LP-040 — **ผู้ใช้เลิกใช้ Antigravity ใน 9router แล้ว (2026-11-19)** ไม่มี connection `antigravity` ใน DB (ใช้ล่าสุด 2026-11-14 12:22) → ข้าม probe ของ `ag/` ในรอบต่อไป (warning `No credentials for antigravity` ใน log เป็นเรื่องปกติ); LP-040 ยังคงไว้ในโค้ดพร้อม unit test · LP-041 (connection `muse` ปิดอยู่เหมือนรอบก่อน)
 - หลัง restart ไม่มี `✗ ERROR` / `no pricing` (มีแค่ warning antigravity ไม่มี credential ซึ่งเป็นสภาพเดิม)
 
 ### Security notes ของ upstream v0.5.119 (ตรวจโดย deep-reasoner read-only; spot-check บรรทัดหลักเอง)

@@ -65,14 +65,18 @@ export async function ensureClaudeCliVersion(fetchImpl) {
   return getClaudeCliVersion();
 }
 
-const UA_RE = /claude-cli\/\d+\.\d+\.\d+/g;
+const UA_RE = /claude-cli\/(\d+\.\d+\.\d+)/g;
 // Rewrite claude-cli/x.y.z in header values to the live version (object or Headers).
 export function applyClaudeCliVersion(headers) {
   if (!headers) return headers;
   const v = getClaudeCliVersion();
   // Never downgrade a fingerprint to an invalid/placeholder version.
   if (!VERSION_RE.test(v) || cmp(v, "1.0.0") < 0) return headers;
-  const fix = (val) => (typeof val === "string" ? val.replace(UA_RE, `claude-cli/${v}`) : val);
+  // LP-004: only raise a version — a forwarded client that updated past the cached
+  // npm "latest" (or the floor, when npm is unreachable) keeps its real version.
+  const fix = (val) => (typeof val === "string"
+    ? val.replace(UA_RE, (match, found) => (cmp(found, v) < 0 ? `claude-cli/${v}` : match))
+    : val);
   if (typeof Headers !== "undefined" && headers instanceof Headers) {
     const out = new Headers(headers);
     for (const [k, val] of headers.entries()) out.set(k, fix(val));

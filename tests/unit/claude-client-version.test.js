@@ -22,6 +22,7 @@ vi.mock("../../open-sse/handlers/chatCore/nonStreamingHandler.js", () => ({
 
 const { handleChatCore } = await import("../../open-sse/handlers/chatCore.js");
 const { handleComboChat } = await import("../../open-sse/services/combo.js");
+const { CLAUDE_CLI_VERSION } = await import("../../open-sse/providers/shared.js");
 const { DefaultExecutor } = await import("../../open-sse/executors/default.js");
 
 describe("Claude Code version forwarding", () => {
@@ -56,9 +57,9 @@ describe("Claude Code version forwarding", () => {
     const upstreamBody = JSON.parse(init.body);
     expect(upstreamBody.model).toBe("claude-opus-5-5");
     expect.soft(new Headers(init.headers).get("user-agent"))
-      .toBe("claude-cli/2.1.280 (external, sdk-cli)");
+      .toBe(`claude-cli/${CLAUDE_CLI_VERSION} (external, sdk-cli)`);
     expect.soft(upstreamBody.system[0].text)
-      .toMatch(/^x-anthropic-billing-header: cc_version=2\.1\.280\./);
+      .toMatch(new RegExp(`^x-anthropic-billing-header: cc_version=${CLAUDE_CLI_VERSION.replace(/\./g, "\\.")}\\.`));
   });
 
   it.each(["claude-opus-5", "claude-opus-5-5", "claude-fable-5-1"])(

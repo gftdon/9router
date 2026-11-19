@@ -29,6 +29,13 @@ export function isFreeModel(model) {
  * Canonical model pricing — provider-agnostic.
  * Cover all known models; deduplicated across providers.
  */
+// LP-039: Haiku 5.5 is priced by prompt length (platform.claude.com/docs/en/about-claude/pricing,
+// 2026-10-08). Shared by the exact MODEL_PRICING row and the glob below.
+const HAIKU_5_5_PRICING = {
+  input: 0.10, output: 0.50, cached: 0.01, reasoning: 0.50, cache_creation: 0.125,
+  longContext: { threshold: 100000, input: 0.50, output: 2.50, cached: 0.05, reasoning: 2.50, cache_creation: 0.625 },
+};
+
 export const MODEL_PRICING = {
   // === Anthropic / Claude ===
   "claude-opus-4-6":              { input: 5.00,  output: 25.00, cached: 0.50,  reasoning: 25.00,  cache_creation: 6.25  },
@@ -56,7 +63,7 @@ export const MODEL_PRICING = {
   "claude-fable-5-2":             { input: 8.00,  output: 40.00, cached: 0.20,  reasoning: 40.00,  cache_creation: 10.00 },
   "claude-fable-5-1":             { input: 10.00, output: 50.00, cached: 1.00,  reasoning: 50.00,  cache_creation: 12.50 },
   "claude-fable-5":               { input: 10.00, output: 50.00, cached: 1.00,  reasoning: 50.00,  cache_creation: 12.50 },
-  "claude-haiku-5-5":             { input: 0.10,  output: 0.50,  cached: 0.01,  reasoning: 0.50,   cache_creation: 0.125 },
+  "claude-haiku-5-5":             HAIKU_5_5_PRICING, // LP-039: keeps the >100k long-prompt tier
   "claude-sonnet-5-5":            { input: 2.00,  output: 10.00, cached: 0.20,  reasoning: 10.00,  cache_creation: 2.50  },
   "claude-sonnet-5-5-thinking":   { input: 2.00,  output: 10.00, cached: 0.20,  reasoning: 10.00,  cache_creation: 2.50  },
   "claude-sonnet-5-5-high":       { input: 2.00,  output: 10.00, cached: 0.20,  reasoning: 10.00,  cache_creation: 2.50  },
@@ -348,10 +355,8 @@ export const PATTERN_PRICING = [
   { pattern: "*-codex",         pricing: { input: 1.75,  output: 14.00, cached: 0.175, reasoning: 14.00,  cache_creation: 1.75  } },
 
   // --- Claude ---
-  // LP-039: Haiku 5.5 is priced by prompt length (platform.claude.com/docs/en/about-claude/pricing,
-  // 2026-10-08). A glob, not a MODEL_PRICING key, so "claude-haiku-5-5(high)" can't fall to claude-haiku-*.
-  { pattern: "claude-haiku-5-5*", pricing: { input: 0.10, output: 0.50, cached: 0.01, reasoning: 0.50, cache_creation: 0.125,
-    longContext: { threshold: 100000, input: 0.50, output: 2.50, cached: 0.05, reasoning: 2.50, cache_creation: 0.625 } } },
+  // LP-039: the glob catches suffixed/dated ids ("claude-haiku-5-5(high)") so they can't fall to claude-haiku-*.
+  { pattern: "claude-haiku-5-5*", pricing: HAIKU_5_5_PRICING },
   { pattern: "claude-opus-*",   pricing: { input: 5.00,  output: 25.00, cached: 0.50,  reasoning: 25.00,  cache_creation: 6.25  } },
   { pattern: "claude-sonnet-*", pricing: { input: 3.00,  output: 15.00, cached: 0.30,  reasoning: 15.00,  cache_creation: 3.75  } },
   { pattern: "claude-haiku-*",  pricing: { input: 1.00,  output: 5.00,  cached: 0.10,  reasoning: 5.00,   cache_creation: 1.25  } },

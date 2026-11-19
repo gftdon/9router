@@ -39,4 +39,15 @@ describe("Claude Haiku 5.5 pricing", () => {
     );
     expect(cost).toBeCloseTo((10_000 * 0.5 + 100_000 * 0.05 + 10_000 * 0.625 + 2_000 * 2.5) / 1_000_000, 12);
   });
+
+  // v0.5.119 added an exact MODEL_PRICING["claude-haiku-5-5"] row, which wins over the
+  // LP-039 glob — the plain id must still carry the >100k tier.
+  it.each(["claude-haiku-5-5", "anthropic/claude-haiku-5-5"])(
+    "bills a long prompt on the plain id %s at the long-prompt rate",
+    (model) => {
+      const pricing = getPricingForModel("claude", model);
+      const cost = calculateCostFromTokens({ prompt_tokens: 150_000, completion_tokens: 1_000 }, pricing);
+      expect(cost).toBeCloseTo((150_000 * 0.5 + 1_000 * 2.5) / 1_000_000, 12);
+    },
+  );
 });

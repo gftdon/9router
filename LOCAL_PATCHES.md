@@ -8,7 +8,7 @@
 | รายการ | ค่า |
 |---|---|
 | Upstream base | `v0.5.116` (`1339107e` "0.5.116", **ไม่มี tag** — tag ล่าสุดของ upstream คือ `v0.5.112`) — merge `41393f64` (2026-11-08) + ถอด UA CLI ของ LP-040 `8f25c2d6` · deploy 2026-11-09 08:19 + push แล้ว · รอบก่อน `v0.5.104` (`87a74e1b`, มี tag) merge `c416e08f` + ถอด LP-016 `65cadf53` (deploy 2026-10-19) |
-| รอบ v0.5.119 (2026-11-19) | branch `upgrade/v0.5.119` (merge `48b668f0` + `858d8010` + `affc008e` + `3c74b20e` + docs) — **ยังไม่ ff `master`, ยังไม่ push** · **ติดตั้ง + restart แล้ว 2026-11-19 10:45** (ดู "Deploy + live verification (2026-11-19)" ในหัวข้อ v0.5.119) |
+| รอบ v0.5.119 (2026-11-19) | branch `upgrade/v0.5.119` (merge `48b668f0` + `858d8010` + `affc008e` + `3c74b20e` + docs) — fast-forward `master` + push แล้ว 2026-11-19 (push ปกติ ไม่ force, `1e9b76a7..83a0e7dd` รวม commit LP-043 4 ตัวที่ค้างจากรอบก่อน) · **ติดตั้ง + restart แล้ว 2026-11-19 10:45** (ดู "Deploy + live verification (2026-11-19)" ในหัวข้อ v0.5.119) |
 | `origin/master` (`gftdon/9router`) | push รอบ v0.5.116 (2026-11-09, push ปกติ ไม่ force) `b124a81d..2b6e65cc` + commit docs ที่บันทึก deploy นี้ — ทำบน branch `upgrade/v0.5.116` แล้ว fast-forward `master` · ก่อนหน้า push รอบ v0.5.104 (2026-10-19) ถึง `b124a81d` |
 | Build ที่ติดตั้ง global | `9router-0.5.119.tgz` (gitignored) build 2026-11-19 09:58 จากโค้ด `3c74b20e` (v0.5.119 + แพตช์ทั้งหมด; commit docs ไม่เปลี่ยนโค้ด) — 16,671,327 bytes, SHA-256 `587be9e4f7a8cc98406e69fa8dc65c230166f3f613d919fc0d591f00f8af849f` — ติดตั้ง 2026-11-19 10:45 · สำรอง: build ก่อนหน้า `9router-0.5.116.tgz` ที่ root ของ repo (SHA `fa52018b…` ตรงกับที่ติดตั้งก่อนหน้า) + SQLite `~/.9router/db/backups/data.sqlite.pre-v05119-20261119` (`.backup` แบบ online, integrity ok, 317,849 แถว `usageHistory`, 0600 — มี token ของ provider) + plist `~/.9router/com.9router.autostart.plist.bak-20261119` · rollback: `npm install --global ./9router-0.5.116.tgz` แล้ว restart ตามวิธีด้านล่าง |
 | Server ที่รันอยู่ | LaunchAgent `com.9router.autostart` (`cli.js --tray --skip-update --log`) — `launchctl kickstart` 2026-11-19 10:45:14 (launcher PID 58229, server 58244 `next-server v16.4.5`, tray 58247; banner `🚀 9router v0.5.119`) · ⚠️ ก่อนหน้านี้ (14–19 พ.ย.) gateway ถูกเปิดด้วยมือจาก shell ใน herdr (`9router` เปล่า ไม่มี `--log`) → `server.log` ไม่มีบรรทัดใหม่เลยในช่วงนั้น · วิธีหยุด: `kill -TERM` launcher แล้ว server (KeepAlive=false ไม่เกิดใหม่เอง) → ติดตั้ง → kickstart · ⚠️ `next-server v16.2.10` เป็น server ของโปรเจกต์อื่น ห้ามหยุด |
@@ -72,7 +72,7 @@
 ## ตรวจ Local Patches เมื่ออัปเดตเป็น v0.5.119 — 2026-11-19
 
 Upstream: tag `v0.5.119` = `d1970ac9` "Bump version" (ลูกของ `1855aa44` "# v0.5.119 (2026-11-11)") — 40 commits, 116 ไฟล์ เทียบกับ `1339107e` v0.5.116 (upstream สร้าง tag `v0.5.116` ย้อนหลังที่ `1339107e` แล้ว)
-Branch `upgrade/v0.5.119` (ยัง**ไม่** fast-forward `master`, ยังไม่ push): merge `48b668f0` + `858d8010` (LP-039) + `affc008e` (LP-040) + `3c74b20e` (LP-004) — merge ตามแบบรอบก่อน ไม่ rebase
+Branch `upgrade/v0.5.119` (fast-forward `master` + push แล้ว 2026-11-19): merge `48b668f0` + `858d8010` (LP-039) + `affc008e` (LP-040) + `3c74b20e` (LP-004) — merge ตามแบบรอบก่อน ไม่ rebase
 ตรวจ implementation จริงของ upstream + รันเทสเทียบ upstream เปล่า (worktree แยก) + ดู `usageHistory` (cache write ของ gemini-4) — ไม่ได้ตัดสินจาก changelog/ชื่อ commit
 
 ### ไฟล์ที่ upstream แตะทับแพตช์ (14 ไฟล์ที่ทั้งสองฝั่งแก้ ไม่นับ `CHANGELOG.md`; conflict 4 ไฟล์)

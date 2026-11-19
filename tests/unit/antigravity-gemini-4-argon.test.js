@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getModelUpstreamId } from "../../open-sse/config/providerModels.js";
 import { AntigravityExecutor } from "../../open-sse/executors/antigravity.js";
 import { getCapabilitiesForModel } from "../../open-sse/providers/capabilities.js";
-import { MODEL_PRICING } from "../../open-sse/providers/pricing.js";
+import { getPricingForModel } from "../../open-sse/providers/pricing.js";
 import antigravity from "../../open-sse/providers/registry/antigravity.js";
 import * as shared from "../../open-sse/providers/shared.js";
 import { applyThinking, stripThinkingSuffix } from "../../open-sse/translator/concerns/thinkingUnified.js";
@@ -57,10 +57,11 @@ describe("Gemini 4 Argon on Antigravity (LP-040)", () => {
     });
   });
 
-  it("prices every Argon id", () => {
-    const rate = { input: 2.0, output: 10.0, cached: 0.1, reasoning: 10.0, cache_creation: 2.5 };
+  it("prices every Argon id at the Gemini 4 rate, not the generic gemini-* one", () => {
+    // Upstream's gemini-4-* pattern (4c7804ef, v0.5.119) replaced LP-040's own rows.
+    const rate = { input: 2.0, output: 10.0, cached: 0.1, reasoning: 10.0, cache_creation: 0.1875 };
     for (const id of ["gemini-4-argon", "gemini-4-argon-high", "gemini-4-argon-medium", "gemini-4-argon-low"]) {
-      expect(MODEL_PRICING[id]).toEqual(rate);
+      expect(getPricingForModel("antigravity", id)).toEqual(rate);
     }
   });
 
